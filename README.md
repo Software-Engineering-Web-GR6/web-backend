@@ -25,6 +25,7 @@ Cảm biến (DHT22, MQ-135...)
 │ Bật quạt/cửa│           │ Push WebSocket   │
 └──────────────┘           └─────────────────┘
 ```
+Cấu trúc tham khảo, có thể thay đổi
 ```bash
 smart_classroom/
 │
