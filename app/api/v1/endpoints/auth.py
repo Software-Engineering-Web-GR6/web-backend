@@ -1,0 +1,73 @@
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.dependencies import get_db_session, require_admin
+from app.schemas.auth import TokenResponse, UserCreateRequest, UserResponse
+from app.services.auth_service import auth_service
+
+router = APIRouter()   # KHÔNG để prefix="/auth"
+
+
+@router.post("/login", response_model=TokenResponse)
+async def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: AsyncSession = Depends(get_db_session),
+):
+    await auth_service.seed_admin_if_empty(db)
+    try:
+        token = await auth_service.login(
+            db,
+            form_data.username,   # username ở Swagger chính là email
+            form_data.password,
+        )
+        return {"access_token": token, "token_type": "bearer"}
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(exc),
+        )
+
+
+@router.post("/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+async def create_user(
+    payload: UserCreateRequest,
+    db: AsyncSession = Depends(get_db_session),
+    _: dict = Depends(require_admin),
+):
+    try:
+        return await auth_service.create_user(
+            db,
+            payload.full_name,
+            str(payload.email),
+            payload.password,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        )
+
+
+@router.get("/users", response_model=list[UserResponse])
+async def list_users(
+    db: AsyncSession = Depends(get_db_session),
+    _: dict = Depends(require_admin),
+):
+    return await auth_service.list_users(db)
+
+
+@router.delete("/users/{user_id}")
+async def delete_user(
+    user_id: int,
+    db: AsyncSession = Depends(get_db_session),
+    _: dict = Depends(require_admin),
+):
+    try:
+        await auth_service.delete_user(db, user_id)
+        return {"message": "User deleted successfully"}
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        )
