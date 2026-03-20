@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.dependencies import get_db_session, require_admin, get_current_user
+from app.core.dependencies import get_db_session, require_admin, require_room_access
 from app.schemas.automation_rule import RuleCreate, RuleResponse, RuleUpdate
 from app.services.rule_service import rule_service
 
@@ -8,7 +8,7 @@ router = APIRouter()
 
 
 @router.get("/room/{room_id}", response_model=list[RuleResponse])
-async def list_rules(room_id: int, db: AsyncSession = Depends(get_db_session), _: dict = Depends(get_current_user)):
+async def list_rules(room_id: int, db: AsyncSession = Depends(get_db_session), _: dict = Depends(require_room_access)):
     return await rule_service.list_by_room(db, room_id)
 
 @router.post("/", response_model=RuleResponse)

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.dependencies import get_db_session, get_current_user
+from app.core.dependencies import get_db_session, require_room_access
 from app.services.sensor_service import sensor_service
 from app.schemas.sensor import SensorReadingResponse
 from app.schemas.device import DeviceResponse
@@ -10,7 +10,7 @@ router = APIRouter()
 
 
 @router.get("/{room_id}")
-async def get_dashboard(room_id: int, db: AsyncSession = Depends(get_db_session), _: dict = Depends(get_current_user)):
+async def get_dashboard(room_id: int, db: AsyncSession = Depends(get_db_session), _: dict = Depends(require_room_access)):
     data = await sensor_service.get_dashboard(db, room_id)
     return {
         "room_id": data["room_id"],
