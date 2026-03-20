@@ -21,3 +21,20 @@ class UserResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class UserRoomAccessGrantRequest(BaseModel):
+    room_id: int = Field(gt=0)
+    shifts: list[int] = Field(min_length=1, max_length=6)
+    days_of_week: list[int] = Field(min_length=1, max_length=7)
+
+
+class UserRoomAccessResponse(BaseModel):
+    id: int
+    user_id: int
+    room_id: int
+    shift_number: int
+    day_of_week: int
+    created_at: datetime
+
+    model_config = {"from_attributes": True}

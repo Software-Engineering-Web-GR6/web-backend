@@ -69,7 +69,7 @@ def send(temp: float, token: str) -> None:
             f" | co2={payload['co2']}ppm  →  HTTP {res.status_code}"
         )
     except requests.exceptions.ConnectionError:
-        print(f"[{datetime.now().isoformat()}]  {temp}°C  →  ⚠️  Không kết nối được backend")
+        print(f"[{datetime.now().isoformat()}]  {temp}°C  →   Không kết nối được backend")
     except Exception as e:
         print(f"Lỗi: {e}")
 

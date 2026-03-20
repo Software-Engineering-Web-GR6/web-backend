@@ -92,4 +92,3 @@ smart_classroom/
     │   ├── alert.py             ← AlertResponse
     |    └── auth.py              ← LoginRequest, TokenResponse
 ```
-    

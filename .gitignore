@@ -1,11 +1,10 @@
 venv/
 __pycache__/
 .env
-.env.*
 *.db
 *.sqlite
 *.sqlite3
-
+tests
 # Python caches
 *.py[cod]
 *$py.class
