@@ -4,7 +4,7 @@ __pycache__/
 *.db
 *.sqlite
 *.sqlite3
-tests
+
 # Python caches
 *.py[cod]
 *$py.class
