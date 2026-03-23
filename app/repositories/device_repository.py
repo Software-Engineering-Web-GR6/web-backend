@@ -9,7 +9,11 @@ class DeviceRepository(BaseRepository):
         super().__init__(Device)
 
     async def get_by_room(self, db, room_id: int):
-        result = await db.execute(select(Device).where(Device.room_id == room_id))
+        result = await db.execute(
+            select(Device)
+            .where(Device.room_id == room_id)
+            .order_by(Device.device_type.asc(), Device.name.asc(), Device.id.asc())
+        )
         return list(result.scalars().all())
 
     async def update_state(self, db, device: Device, state: str):

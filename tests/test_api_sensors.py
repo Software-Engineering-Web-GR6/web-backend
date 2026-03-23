@@ -25,6 +25,22 @@ class TestSensorsAPI:
         body = resp.json()
         assert len(body["executed_rules"]) > 0
 
+    async def test_ingest_skips_automation_when_room_is_manual(self, client, auth_headers):
+        update_mode = await client.put(
+            "/api/v1/rooms/1/automation-mode",
+            json={"auto_control_enabled": False},
+            headers=auth_headers,
+        )
+        assert update_mode.status_code == 200
+
+        resp = await client.post(
+            "/api/v1/sensors/ingest",
+            json={"room_id": 1, "temperature": 35, "humidity": 60, "co2": 800},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["executed_rules"] == []
+
     async def test_ingest_no_rule_triggered_below_threshold(self, client, auth_headers):
         resp = await client.post(
             "/api/v1/sensors/ingest",

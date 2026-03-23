@@ -1,9 +1,11 @@
 from datetime import datetime, timezone
+from app.repositories.room_repository import room_repository
 from app.repositories.sensor_repository import sensor_repository
 from app.repositories.rule_repository import rule_repository
 from app.domain.automation_engine import automation_engine
 from app.services.alert_service import alert_service
 from app.services.device_service import device_service
+from app.websocket.manager import ws_manager
 
 
 class SensorService:
@@ -12,13 +14,31 @@ class SensorService:
         if data.get("recorded_at") is None:
             data["recorded_at"] = datetime.now(timezone.utc)
         reading = await sensor_repository.create(db, **data)
-        rules = await rule_repository.get_active_rules_by_room(db, payload.room_id)
-        executed = await automation_engine.evaluate_rules(
-            reading=reading,
-            rules=rules,
-            alert_service=alert_service,
-            device_service=device_service,
-            db=db,
+        room = await room_repository.get_by_id(db, payload.room_id)
+        executed = []
+        if room is not None and room.auto_control_enabled:
+            rules = await rule_repository.get_active_rules_by_room(db, payload.room_id)
+            executed = await automation_engine.evaluate_rules(
+                reading=reading,
+                rules=rules,
+                alert_service=alert_service,
+                device_service=device_service,
+                db=db,
+            )
+        await ws_manager.broadcast_json(
+            {
+                "event": "sensor_reading",
+                "reading": {
+                    "id": reading.id,
+                    "room_id": reading.room_id,
+                    "temperature": reading.temperature,
+                    "humidity": reading.humidity,
+                    "co2": reading.co2,
+                    "motion_detected": reading.motion_detected,
+                    "recorded_at": reading.recorded_at.isoformat(),
+                },
+                "executed_rules": executed,
+            }
         )
         return reading, executed
 
