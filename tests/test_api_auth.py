@@ -122,6 +122,43 @@ class TestAuthAPI:
         assert isinstance(body, list)
         assert any(item["email"] == "list-target@example.com" for item in body)
 
+    async def test_get_me_returns_current_user(self, client, auth_headers):
+        resp = await client.get("/api/v1/auth/me", headers=auth_headers)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["email"] == "admin@example.com"
+        assert body["role"] == "admin"
+
+    async def test_current_user_can_change_password(self, client, auth_headers):
+        resp = await client.put(
+            "/api/v1/auth/me/password",
+            json={
+                "current_password": "admin123",
+                "new_password": "admin12345",
+            },
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["message"] == "Password updated successfully"
+
+        login_resp = await client.post(
+            "/api/v1/auth/login",
+            data={"username": "admin@example.com", "password": "admin12345"},
+        )
+        assert login_resp.status_code == 200
+
+    async def test_change_password_rejects_wrong_current_password(self, client, auth_headers):
+        resp = await client.put(
+            "/api/v1/auth/me/password",
+            json={
+                "current_password": "wrong-password",
+                "new_password": "admin12345",
+            },
+            headers=auth_headers,
+        )
+        assert resp.status_code == 400
+        assert resp.json()["detail"] == "Current password is incorrect"
+
     async def test_non_admin_cannot_list_users(self, client, auth_headers):
         create_user_resp = await client.post(
             "/api/v1/auth/users",

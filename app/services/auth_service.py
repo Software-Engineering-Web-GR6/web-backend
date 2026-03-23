@@ -6,6 +6,10 @@ from app.core.security import verify_password, create_access_token, hash_passwor
 
 
 class AuthService:
+    async def get_user_by_id(self, db, user_id: int):
+        result = await db.execute(select(User).where(User.id == user_id))
+        return result.scalar_one_or_none()
+
     async def login(self, db, email: str, password: str):
         result = await db.execute(select(User).where(User.email == email))
         user = result.scalar_one_or_none()
@@ -46,6 +50,20 @@ class AuthService:
         await db.refresh(user)
         return user
 
+    async def change_password(self, db, user_id: int, current_password: str, new_password: str):
+        user = await self.get_user_by_id(db, user_id)
+        if not user:
+            raise ValueError("User not found")
+        if not verify_password(current_password, user.password_hash):
+            raise ValueError("Current password is incorrect")
+        if current_password == new_password:
+            raise ValueError("New password must be different from current password")
+
+        user.password_hash = hash_password(new_password)
+        await db.commit()
+        await db.refresh(user)
+        return user
+
     async def list_users(self, db):
         result = await db.execute(select(User).order_by(User.id.asc()))
         return result.scalars().all()
@@ -76,11 +94,25 @@ class AuthService:
 
         normalized_days = sorted(set(days_of_week))
         if any(day < 0 or day > 6 for day in normalized_days):
-            raise ValueError("Day of week must be between 0 (Sunday) and 6 (Saturday)")
+            raise ValueError("Day of week must be between 0 (Monday) and 6 (Sunday)")
 
         granted = []
         for shift in normalized_shifts:
             for day in normalized_days:
+                occupied_result = await db.execute(
+                    select(UserRoomShiftAccess).where(
+                        UserRoomShiftAccess.user_id != user_id,
+                        UserRoomShiftAccess.room_id == room_id,
+                        UserRoomShiftAccess.shift_number == shift,
+                        UserRoomShiftAccess.day_of_week == day,
+                    )
+                )
+                occupied = occupied_result.scalar_one_or_none()
+                if occupied:
+                    raise ValueError(
+                        f"Room {room_id} is already assigned for shift {shift} on day {day}"
+                    )
+
                 existing_result = await db.execute(
                     select(UserRoomShiftAccess).where(
                         UserRoomShiftAccess.user_id == user_id,
@@ -109,6 +141,14 @@ class AuthService:
             select(UserRoomShiftAccess)
             .where(UserRoomShiftAccess.user_id == user_id)
             .order_by(UserRoomShiftAccess.room_id.asc(), UserRoomShiftAccess.shift_number.asc())
+        )
+        return list(result.scalars().all())
+
+    async def list_room_occupancy(self, db, room_id: int):
+        result = await db.execute(
+            select(UserRoomShiftAccess)
+            .where(UserRoomShiftAccess.room_id == room_id)
+            .order_by(UserRoomShiftAccess.day_of_week.asc(), UserRoomShiftAccess.shift_number.asc())
         )
         return list(result.scalars().all())
 
