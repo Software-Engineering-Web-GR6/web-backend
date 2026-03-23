@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import ANY, AsyncMock, MagicMock
 from app.services.rule_service import RuleService
 
 
@@ -83,14 +83,47 @@ class TestRuleServiceUpdate:
         existing_rule.metric = "temperature"
         existing_rule.operator = ">"
         existing_rule.action = "ON"
+        existing_rule.room_id = 1
 
         with patch("app.services.rule_service.rule_repository") as mock_repo:
-            mock_repo.get_by_id = AsyncMock(return_value=existing_rule)
-            mock_repo.update = AsyncMock(return_value=existing_rule)
+            with patch("app.services.rule_service.room_repository") as mock_room_repo:
+                mock_room = MagicMock()
+                mock_room.auto_control_enabled = True
+                mock_room_repo.get_by_id = AsyncMock(return_value=mock_room)
+                mock_room_repo.update = AsyncMock(return_value=mock_room)
+                mock_repo.get_by_id = AsyncMock(return_value=existing_rule)
+                mock_repo.update = AsyncMock(return_value=existing_rule)
+                mock_repo.has_active_rules_by_room = AsyncMock(return_value=True)
 
-            payload = MagicMock()
-            payload.model_dump.return_value = {"threshold_value": 35}  # only update threshold
+                payload = MagicMock()
+                payload.model_dump.return_value = {"threshold_value": 35}  # only update threshold
 
-            result = await self.svc.update(db=AsyncMock(), rule_id=1, payload=payload)
-            called_updates = mock_repo.update.call_args[0][2]
-            assert called_updates == {"threshold_value": 35}
+                result = await self.svc.update(db=AsyncMock(), rule_id=1, payload=payload)
+                called_updates = mock_repo.update.call_args[0][2]
+                assert called_updates == {"threshold_value": 35}
+                assert result is existing_rule
+
+    async def test_update_syncs_room_mode_when_last_active_rule_is_disabled(self):
+        from unittest.mock import patch
+
+        existing_rule = MagicMock()
+        existing_rule.metric = "temperature"
+        existing_rule.operator = ">"
+        existing_rule.action = "ON"
+        existing_rule.room_id = 1
+
+        with patch("app.services.rule_service.rule_repository") as mock_repo:
+            with patch("app.services.rule_service.room_repository") as mock_room_repo:
+                mock_room = MagicMock()
+                mock_room.auto_control_enabled = True
+                mock_repo.get_by_id = AsyncMock(return_value=existing_rule)
+                mock_repo.update = AsyncMock(return_value=existing_rule)
+                mock_repo.has_active_rules_by_room = AsyncMock(return_value=False)
+                mock_room_repo.get_by_id = AsyncMock(return_value=mock_room)
+                mock_room_repo.update = AsyncMock(return_value=mock_room)
+
+                payload = MagicMock()
+                payload.model_dump.return_value = {"is_active": False}
+
+                await self.svc.update(db=AsyncMock(), rule_id=1, payload=payload)
+                mock_room_repo.update.assert_called_once_with(ANY, mock_room, {"auto_control_enabled": False})

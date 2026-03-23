@@ -3,8 +3,10 @@ from app.websocket.manager import ws_manager
 
 
 class AlertService:
-    async def list_all(self, db):
-        return await alert_repository.get_all_ordered(db)
+    async def list_all(self, db, room_ids: list[int] | None = None):
+        if room_ids is None:
+            return await alert_repository.get_all_ordered(db)
+        return await alert_repository.get_all_by_room_ids(db, room_ids)
 
     async def get_open_alert(self, db, room_id: int, level: str, message: str):
         return await alert_repository.get_open_by_room_and_message(db, room_id, level, message)

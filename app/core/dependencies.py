@@ -5,6 +5,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.alert import Alert
 from app.models.device import Device
 from app.models.user_room_shift_access import UserRoomShiftAccess
 from app.db.session import get_db
@@ -85,6 +86,37 @@ async def ensure_room_shift_access(db: AsyncSession, current_user: dict, room_id
         )
 
 
+async def get_accessible_room_ids(db: AsyncSession, current_user: dict) -> list[int]:
+    if current_user.get("role") == "admin":
+        result = await db.execute(select(UserRoomShiftAccess.room_id).distinct())
+        return list(result.scalars().all())
+
+    user_id_raw = current_user.get("sub")
+    if not user_id_raw:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+
+    try:
+        user_id = int(user_id_raw)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+
+    current_shift = get_current_shift()
+    if current_shift is None:
+        return []
+
+    current_day = datetime.now().weekday()
+    result = await db.execute(
+        select(UserRoomShiftAccess.room_id)
+        .where(
+            UserRoomShiftAccess.user_id == user_id,
+            UserRoomShiftAccess.shift_number == current_shift,
+            UserRoomShiftAccess.day_of_week == current_day,
+        )
+        .distinct()
+    )
+    return list(result.scalars().all())
+
+
 async def require_room_access(
     room_id: int,
     db: AsyncSession = Depends(get_db_session),
@@ -105,4 +137,18 @@ async def require_device_access(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
 
     await ensure_room_shift_access(db, current_user, device.room_id)
+    return current_user
+
+
+async def require_alert_access(
+    alert_id: int,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    result = await db.execute(select(Alert).where(Alert.id == alert_id))
+    alert = result.scalar_one_or_none()
+    if not alert:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
+
+    await ensure_room_shift_access(db, current_user, alert.room_id)
     return current_user

@@ -16,6 +16,17 @@ class AlertRepository(BaseRepository):
         result = await db.execute(select(Alert).order_by(Alert.created_at.desc()))
         return list(result.scalars().all())
 
+    async def get_all_by_room_ids(self, db, room_ids: list[int]):
+        if not room_ids:
+            return []
+
+        result = await db.execute(
+            select(Alert)
+            .where(Alert.room_id.in_(room_ids))
+            .order_by(Alert.created_at.desc())
+        )
+        return list(result.scalars().all())
+
     async def create_alert(self, db, room_id: int, level: str, message: str):
         return await self.create(db, room_id=room_id, level=level, message=message, status="OPEN")
 

@@ -6,7 +6,7 @@ from app.core.config import settings
 from app.db.session import init_db, AsyncSessionLocal
 from app.db.seed import seed_data
 from app.websocket.manager import ws_manager
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -29,8 +29,8 @@ app.add_middleware(
 app.include_router(api_router, prefix="/api/v1")
 
 
-@app.get("/")
-async def root():
+@app.get("/health")
+async def health():
     return {"message": f"{settings.APP_NAME} is running"}
 
 
@@ -45,6 +45,10 @@ async def alerts_websocket(websocket: WebSocket):
     except Exception:
         await ws_manager.disconnect(websocket)
         raise
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return Response(status_code=204)
 
 @app.get("/", include_in_schema=False)
 async def root():
