@@ -16,6 +16,8 @@ __pycache__/
 .coverage
 .coverage.*
 htmlcov/
+simulator.stdout.log
+simulator.stderr.log
 
 # OS/editor
 .DS_Store
