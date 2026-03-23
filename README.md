@@ -1,11 +1,23 @@
 # Smart Classroom Backend
 
+Backend cho hệ thống giám sát và điều khiển phòng học thông minh.
 
-## Yêu cầu môi trường
+## Chức năng chính
 
-- Python 3.11+ (khuyến nghị 3.13 như máy hiện tại)
+- Đăng nhập bằng JWT
+- Quản lý phòng học
+- Nhận dữ liệu cảm biến
+- Điều khiển thiết bị
+- Tự động hóa theo rule
+- Cảnh báo và dashboard
+- Phân quyền theo `room + shift + day`
+- Chế độ `tự động / thủ công` theo từng phòng
+- Đổi mật khẩu cho tài khoản đang đăng nhập
+
+## Yêu cầu
+
+- Python 3.11+
 - `pip`
-- Git
 
 Kiểm tra nhanh:
 
@@ -14,101 +26,103 @@ python --version
 pip --version
 ```
 
-## Set Up
+## Cài đặt
 
-### Bước 1: vào thư mục backend
+### 1. Vào thư mục backend
 
-```bash
-cd web-backend
+```cmd
+cd /d e:\baitapCNPM\backend
 ```
 
-### Bước 2: tạo virtual environment
+### 2. Tạo virtual environment
 
-macOS/Linux:
+Windows CMD:
 
-```bash
-python -m venv venv
-source venv/bin/activate
+```cmd
+python -m venv .venv
+.venv\Scripts\activate.bat
 ```
 
-Windows (PowerShell):
+Windows PowerShell:
 
 ```powershell
-python -m venv venv
-venv\Scripts\Activate.ps1
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 ```
 
-### Bước 3: cài dependencies
+### 3. Cài dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### Bước 4: tạo file môi trường
+### 4. Tạo file môi trường
 
-```bash
-cp .env.example .env
+Nếu chưa có `.env.example`, bạn có thể tự tạo file `.env` tối thiểu như sau:
+
+```env
+SECRET_KEY=change-this-secret-key
+DATABASE_URL=sqlite+aiosqlite:///./smart_classroom.db
+ACCESS_TOKEN_EXPIRE_MINUTES=120
 ```
 
-Sau đó chỉnh `SECRET_KEY` trong `.env` bằng chuỗi random an toàn:
+## Chạy backend
 
-```bash
-openssl rand -hex 32
-```
+Nếu đã có sẵn môi trường:
 
-## Chạy ứng dụng
-
-```bash
+```cmd
+cd /d e:\baitapCNPM\backend
+.venv\Scripts\activate.bat
 uvicorn main:app --reload
 ```
 
-Server mặc định chạy tại:
+URL mặc định:
 
-- API: `http://127.0.0.1:8000`
-- Swagger: `http://127.0.0.1:8000/docs`
+- API docs: `http://127.0.0.1:8000/docs`
+- Health: `http://127.0.0.1:8000/health`
+- WebSocket alerts: `ws://127.0.0.1:8000/ws/alerts`
 
-##  Đăng nhập lần đầu
+## Tài khoản mặc định
 
-Hệ thống sẽ seed tài khoản admin mặc định khi login lần đầu:
+Admin được seed tự động:
 
 - Email: `admin@example.com`
 - Password: `admin123`
 
-Endpoint login:
+Đăng nhập:
 
 ```http
 POST /api/v1/auth/login
+Content-Type: application/x-www-form-urlencoded
 ```
 
-Trong Swagger, dùng OAuth2 form:
+Trong Swagger:
 
 - `username` = email
 - `password` = mật khẩu
 
-##  Phân quyền theo phòng + ca + ngày
+## Phân quyền theo phòng, ca, ngày
 
-User thường chỉ được xem/điều khiển phòng khi thỏa cả 3 điều kiện:
+User thường chỉ được xem hoặc điều khiển phòng khi đồng thời đúng:
 
-- đúng `room_id`
-- đúng `shift_number`
-- đúng `day_of_week`
+- `room_id`
+- `shift_number`
+- `day_of_week`
 
-Admin được bypass kiểm tra này.
+Admin được bỏ qua kiểm tra này.
 
-### Khung giờ 6 ca
+Khung giờ 6 ca:
 
-- Ca 1: 07:00 - 09:35
-- Ca 2: 09:35 - 12:00
-- Ca 3: 13:00 - 15:35
-- Ca 4: 15:35 - 18:00
-- Ca 5: 18:15 - 19:50
-- Ca 6: 19:55 - 21:30
+- Ca 1: `07:00 - 09:35`
+- Ca 2: `09:35 - 12:00`
+- Ca 3: `13:00 - 15:35`
+- Ca 4: `15:35 - 18:00`
+- Ca 5: `18:15 - 19:50`
+- Ca 6: `19:55 - 21:30`
 
 `day_of_week` dùng chuẩn Python: `0=Monday ... 6=Sunday`
 
-### API admin cấp quyền
-
-#### Cấp quyền
+### API phân quyền
 
 ```http
 POST /api/v1/auth/users/{user_id}/room-access
@@ -121,19 +135,89 @@ Content-Type: application/json
 }
 ```
 
-#### Xem quyền
-
 ```http
 GET /api/v1/auth/users/{user_id}/room-access
 ```
 
-#### Thu hồi 1 quyền
+```http
+GET /api/v1/auth/me/room-access
+```
+
+```http
+GET /api/v1/auth/rooms/{room_id}/room-access
+```
 
 ```http
 DELETE /api/v1/auth/users/{user_id}/room-access?room_id=1&shift_number=2&day_of_week=0
 ```
 
-##  Chạy test
+## Thiết bị và tự động hóa
+
+Mỗi phòng hiện được seed:
+
+- 4 quạt
+- 4 đèn
+- 3 điều hòa
+
+Chế độ hoạt động của phòng:
+
+- `auto_control_enabled = true`: cho phép automation rules chạy khi ingest sensor
+- `auto_control_enabled = false`: phòng ở chế độ thủ công, backend sẽ bỏ qua automation
+
+API cập nhật mode:
+
+```http
+PUT /api/v1/rooms/{room_id}/automation-mode
+Content-Type: application/json
+
+{
+  "auto_control_enabled": false
+}
+```
+
+Lưu ý:
+
+- Khi chuyển phòng sang `manual`, toàn bộ rules của phòng sẽ bị tắt theo.
+- Khi rules của phòng được bật lại, mode của phòng cũng được đồng bộ lại theo backend.
+
+## Đổi mật khẩu
+
+Tài khoản đang đăng nhập có thể đổi mật khẩu bằng API:
+
+```http
+PUT /api/v1/auth/me/password
+Content-Type: application/json
+
+{
+  "current_password": "admin123",
+  "new_password": "admin12345"
+}
+```
+
+## Sensor Simulator
+
+File `sensor_simulator.py`:
+
+- đăng nhập bằng admin mặc định
+- lấy toàn bộ danh sách phòng từ backend
+- sinh dữ liệu giả cho tất cả phòng
+- phản ứng theo trạng thái thiết bị từng phòng
+
+Chạy:
+
+```cmd
+cd /d e:\baitapCNPM\backend
+.venv\Scripts\activate.bat
+python sensor_simulator.py
+```
+
+Nếu backend đang chạy, simulator sẽ bơm dữ liệu liên tục vào:
+
+```http
+POST /api/v1/sensors/ingest
+```
+
+## Chạy test
 
 Chạy toàn bộ:
 
@@ -141,23 +225,32 @@ Chạy toàn bộ:
 pytest -q
 ```
 
-VD Chạy test phân quyền theo ca/ngày:
+Ví dụ:
 
 ```bash
 pytest -q tests/test_room_shift_access.py
+pytest -q tests/test_api_auth.py
+pytest -q tests/test_api_sensors.py
+pytest -q tests/test_api_alerts.py
 ```
 
-##  Cấu trúc chính
+## Cấu trúc chính
 
 ```text
 app/
-├── api/v1/endpoints/     # REST endpoints
-├── core/                 # config, security, dependencies
-├── db/                   # session + init db
-├── domain/               # automation/condition logic
-├── models/               # SQLAlchemy models
-├── repositories/         # data access layer
-├── schemas/              # Pydantic schemas
-├── services/             # business logic layer
-└── websocket/            # realtime broadcast
+|-- api/v1/endpoints/   # REST endpoints
+|-- core/               # config, security, dependencies
+|-- db/                 # session + init db
+|-- domain/             # automation / condition logic
+|-- models/             # SQLAlchemy models
+|-- repositories/       # data access layer
+|-- schemas/            # Pydantic schemas
+|-- services/           # business logic layer
+`-- websocket/          # realtime broadcast
 ```
+
+## Ghi chú
+
+- Backend test đang pass trong workspace local.
+- Frontend dùng các API trong backend này cho dashboard, thiết bị, cảnh báo, người dùng và cài đặt.
+- Nếu bạn thay đổi inventory thiết bị hoặc logic rule, nên cập nhật lại seed và test tương ứng.

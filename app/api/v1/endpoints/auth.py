@@ -2,8 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_db_session, require_admin
+from app.core.dependencies import get_current_user, get_db_session, require_admin
 from app.schemas.auth import (
+    ChangePasswordRequest,
     TokenResponse,
     UserCreateRequest,
     UserResponse,
@@ -63,6 +64,71 @@ async def list_users(
     return await auth_service.list_users(db)
 
 
+@router.get("/me", response_model=UserResponse)
+async def get_me(
+    db: AsyncSession = Depends(get_db_session),
+    current_user: dict = Depends(get_current_user),
+):
+    user_id_raw = current_user.get("sub")
+    if not user_id_raw:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload",
+        )
+
+    try:
+        user_id = int(user_id_raw)
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload",
+        )
+
+    user = await auth_service.get_user_by_id(db, user_id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+    return user
+
+
+@router.put("/me/password")
+async def change_my_password(
+    payload: ChangePasswordRequest,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: dict = Depends(get_current_user),
+):
+    user_id_raw = current_user.get("sub")
+    if not user_id_raw:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload",
+        )
+
+    try:
+        user_id = int(user_id_raw)
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload",
+        )
+
+    try:
+        await auth_service.change_password(
+            db,
+            user_id=user_id,
+            current_password=payload.current_password,
+            new_password=payload.new_password,
+        )
+        return {"message": "Password updated successfully"}
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        )
+
+
 @router.delete("/users/{user_id}")
 async def delete_user(
     user_id: int,
@@ -101,6 +167,38 @@ async def list_room_access(
     db: AsyncSession = Depends(get_db_session),
     _: dict = Depends(require_admin),
 ):
+    return await auth_service.list_room_shift_access(db, user_id)
+
+
+@router.get("/rooms/{room_id}/room-access", response_model=list[UserRoomAccessResponse])
+async def list_room_occupancy(
+    room_id: int,
+    db: AsyncSession = Depends(get_db_session),
+    _: dict = Depends(require_admin),
+):
+    return await auth_service.list_room_occupancy(db, room_id)
+
+
+@router.get("/me/room-access", response_model=list[UserRoomAccessResponse])
+async def list_my_room_access(
+    db: AsyncSession = Depends(get_db_session),
+    current_user: dict = Depends(get_current_user),
+):
+    user_id_raw = current_user.get("sub")
+    if not user_id_raw:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload",
+        )
+
+    try:
+        user_id = int(user_id_raw)
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload",
+        )
+
     return await auth_service.list_room_shift_access(db, user_id)
 
 
