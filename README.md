@@ -247,10 +247,5 @@ app/
 |-- schemas/            # Pydantic schemas
 |-- services/           # business logic layer
 `-- websocket/          # realtime broadcast
+
 ```
-
-## Ghi chú
-
-- Backend test đang pass trong workspace local.
-- Frontend dùng các API trong backend này cho dashboard, thiết bị, cảnh báo, người dùng và cài đặt.
-- Nếu bạn thay đổi inventory thiết bị hoặc logic rule, nên cập nhật lại seed và test tương ứng.
