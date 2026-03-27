@@ -56,7 +56,7 @@ async def test_user_blocked_when_not_granted_for_current_day(monkeypatch):
         await deps.ensure_room_shift_access(db, current_user, room_id=101)
 
     assert exc_info.value.status_code == 403
-    assert "No access for room 101 in shift 2 on this day" in str(exc_info.value.detail)
+    assert "No schedule entry for room 101 in shift 2 on this day" in str(exc_info.value.detail)
 
 
 @pytest.mark.asyncio

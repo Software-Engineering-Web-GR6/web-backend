@@ -90,3 +90,23 @@ class TestSensorsAPI:
         resp = await client.get("/api/v1/sensors/1/history?limit=10", headers=auth_headers)
         assert resp.status_code == 200
         assert len(resp.json()) == 3
+
+    async def test_admin_can_reset_sensor_history(self, client, auth_headers):
+        for i in range(3):
+            await client.post(
+                "/api/v1/sensors/ingest",
+                json={"room_id": 1, "temperature": 24 + i},
+                headers=auth_headers,
+            )
+
+        reset_resp = await client.delete(
+            "/api/v1/sensors/history/reset",
+            params=[("room_ids", 1)],
+            headers=auth_headers,
+        )
+        assert reset_resp.status_code == 200
+        assert reset_resp.json()["deleted"] >= 3
+
+        history_resp = await client.get("/api/v1/sensors/1/history?limit=10", headers=auth_headers)
+        assert history_resp.status_code == 200
+        assert history_resp.json() == []

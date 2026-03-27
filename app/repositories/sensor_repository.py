@@ -1,4 +1,4 @@
-from sqlalchemy import select, func
+from sqlalchemy import delete, select, func
 from app.models.sensor_reading import SensorReading
 from app.repositories.base import BaseRepository
 
@@ -39,6 +39,15 @@ class SensorRepository(BaseRepository):
             "avg_humidity": row[1],
             "avg_co2": row[2],
         }
+
+    async def clear_history(self, db, room_ids: list[int] | None = None) -> int:
+        statement = delete(SensorReading)
+        if room_ids:
+            statement = statement.where(SensorReading.room_id.in_(room_ids))
+
+        result = await db.execute(statement)
+        await db.commit()
+        return int(result.rowcount or 0)
 
 
 sensor_repository = SensorRepository()

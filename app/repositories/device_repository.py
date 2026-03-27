@@ -23,5 +23,12 @@ class DeviceRepository(BaseRepository):
         await db.refresh(device)
         return device
 
+    async def update_target_temp(self, db, device: Device, target_temp: int):
+        device.target_temp = target_temp
+        device.last_updated = datetime.now(timezone.utc)
+        await db.commit()
+        await db.refresh(device)
+        return device
+
 
 device_repository = DeviceRepository()

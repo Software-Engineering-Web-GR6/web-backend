@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import get_current_user, get_db_session, require_device_access
-from app.schemas.device import DeviceResponse, DeviceControlRequest
+from app.schemas.device import DeviceResponse, DeviceControlRequest, DeviceTemperatureUpdateRequest
 from app.services.device_service import device_service
 
 router = APIRouter()
@@ -30,6 +30,23 @@ async def control_device(
             action=payload.action,
             source=current_user.get("role", "MANUAL").upper(),
             description=f"Manual override by {current_user.get('email')}",
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.put("/{device_id}/temperature", response_model=DeviceResponse)
+async def update_device_temperature(
+    device_id: int,
+    payload: DeviceTemperatureUpdateRequest,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: dict = Depends(require_device_access),
+):
+    try:
+        return await device_service.update_temperature(
+            db,
+            device_id=device_id,
+            target_temp=payload.target_temp,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))

@@ -36,7 +36,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
 
 async def require_admin(current_user: dict = Depends(get_current_user)) -> dict:
     if current_user.get("role") != "admin":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin permission required")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin role required")
     return current_user
 
 
@@ -82,7 +82,7 @@ async def ensure_room_shift_access(db: AsyncSession, current_user: dict, room_id
     if permission is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"No access for room {room_id} in shift {current_shift} on this day",
+            detail=f"No schedule entry for room {room_id} in shift {current_shift} on this day",
         )
 
 
