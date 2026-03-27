@@ -48,6 +48,9 @@ class SensorService:
     async def get_history(self, db, room_id: int, limit: int = 50):
         return await sensor_repository.get_history(db, room_id, limit)
 
+    async def clear_history(self, db, room_ids: list[int] | None = None):
+        return await sensor_repository.clear_history(db, room_ids)
+
     async def get_dashboard(self, db, room_id: int):
         latest = await sensor_repository.get_latest(db, room_id)
         history = await sensor_repository.get_history(db, room_id, 10)

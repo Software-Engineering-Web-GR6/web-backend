@@ -147,6 +147,74 @@ class TestAuthAPI:
         )
         assert login_resp.status_code == 200
 
+    async def test_admin_can_assign_and_list_schedule(self, client, auth_headers):
+        create_resp = await client.post(
+            "/api/v1/auth/users",
+            json={
+                "full_name": "Schedule User",
+                "email": "schedule-user@example.com",
+                "password": "user12345",
+            },
+            headers=auth_headers,
+        )
+        assert create_resp.status_code == 201
+        user_id = create_resp.json()["id"]
+
+        assign_resp = await client.post(
+            f"/api/v1/auth/users/{user_id}/schedule",
+            json={"room_id": 1, "shifts": [2], "days_of_week": [0]},
+            headers=auth_headers,
+        )
+        assert assign_resp.status_code == 200
+        assigned = assign_resp.json()
+        assert len(assigned) == 1
+        assert assigned[0]["room_id"] == 1
+        assert assigned[0]["shift_number"] == 2
+
+        list_resp = await client.get(
+            f"/api/v1/auth/users/{user_id}/schedule",
+            headers=auth_headers,
+        )
+        assert list_resp.status_code == 200
+        listed = list_resp.json()
+        assert len(listed) == 1
+        assert listed[0]["day_of_week"] == 0
+
+    async def test_admin_can_remove_schedule_entry(self, client, auth_headers):
+        create_resp = await client.post(
+            "/api/v1/auth/users",
+            json={
+                "full_name": "Schedule Remove User",
+                "email": "schedule-remove@example.com",
+                "password": "user12345",
+            },
+            headers=auth_headers,
+        )
+        assert create_resp.status_code == 201
+        user_id = create_resp.json()["id"]
+
+        assign_resp = await client.post(
+            f"/api/v1/auth/users/{user_id}/schedule",
+            json={"room_id": 1, "shifts": [3], "days_of_week": [1]},
+            headers=auth_headers,
+        )
+        assert assign_resp.status_code == 200
+
+        remove_resp = await client.delete(
+            f"/api/v1/auth/users/{user_id}/schedule",
+            params={"room_id": 1, "shift_number": 3, "day_of_week": 1},
+            headers=auth_headers,
+        )
+        assert remove_resp.status_code == 200
+        assert remove_resp.json()["message"] == "Schedule entry removed successfully"
+
+        list_resp = await client.get(
+            f"/api/v1/auth/users/{user_id}/schedule",
+            headers=auth_headers,
+        )
+        assert list_resp.status_code == 200
+        assert list_resp.json() == []
+
     async def test_change_password_rejects_wrong_current_password(self, client, auth_headers):
         resp = await client.put(
             "/api/v1/auth/me/password",

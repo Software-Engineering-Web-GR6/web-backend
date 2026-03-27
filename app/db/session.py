@@ -23,7 +23,11 @@ async def init_db():
         await conn.run_sync(Base.metadata.create_all)
         room_columns = await conn.execute(text("PRAGMA table_info(rooms)"))
         room_column_names = {row[1] for row in room_columns.fetchall()}
+        device_columns = await conn.execute(text("PRAGMA table_info(devices)"))
+        device_column_names = {row[1] for row in device_columns.fetchall()}
         if "building" not in room_column_names:
             await conn.execute(text("ALTER TABLE rooms ADD COLUMN building VARCHAR(10) DEFAULT 'A' NOT NULL"))
         if "auto_control_enabled" not in room_column_names:
             await conn.execute(text("ALTER TABLE rooms ADD COLUMN auto_control_enabled BOOLEAN DEFAULT 1 NOT NULL"))
+        if "target_temp" not in device_column_names:
+            await conn.execute(text("ALTER TABLE devices ADD COLUMN target_temp INTEGER DEFAULT 24 NOT NULL"))

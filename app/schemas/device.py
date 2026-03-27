@@ -8,6 +8,7 @@ class DeviceResponse(BaseModel):
     name: str
     device_type: str
     state: str
+    target_temp: int
     is_online: bool
     last_updated: datetime
 
@@ -16,3 +17,7 @@ class DeviceResponse(BaseModel):
 
 class DeviceControlRequest(BaseModel):
     action: str
+
+
+class DeviceTemperatureUpdateRequest(BaseModel):
+    target_temp: int

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.dependencies import get_db_session, get_current_user, ensure_room_shift_access
+from app.core.dependencies import get_db_session, get_current_user, ensure_room_shift_access, require_admin
 from app.schemas.sensor import SensorReadingCreate, SensorReadingResponse
 from app.services.sensor_service import sensor_service
 
@@ -41,3 +41,13 @@ async def get_history(
     _: dict = Depends(get_current_user),
 ):
     return await sensor_service.get_history(db, room_id, limit)
+
+
+@router.delete("/history/reset")
+async def reset_sensor_history(
+    room_ids: list[int] | None = Query(default=None),
+    db: AsyncSession = Depends(get_db_session),
+    _: dict = Depends(require_admin),
+):
+    deleted = await sensor_service.clear_history(db, room_ids)
+    return {"deleted": deleted, "room_ids": room_ids or "all"}

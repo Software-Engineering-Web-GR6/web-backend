@@ -43,3 +43,11 @@ class UserRoomAccessResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class UserScheduleAssignRequest(UserRoomAccessGrantRequest):
+    pass
+
+
+class UserScheduleEntryResponse(UserRoomAccessResponse):
+    pass

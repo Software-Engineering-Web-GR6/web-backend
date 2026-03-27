@@ -110,7 +110,7 @@ class AuthService:
                 occupied = occupied_result.scalar_one_or_none()
                 if occupied:
                     raise ValueError(
-                        f"Room {room_id} is already assigned for shift {shift} on day {day}"
+                        f"Room {room_id} already has a schedule entry for shift {shift} on day {day}"
                     )
 
                 existing_result = await db.execute(
@@ -136,6 +136,9 @@ class AuthService:
             await db.refresh(access)
         return granted
 
+    async def assign_user_schedule(self, db, user_id: int, room_id: int, shifts: list[int], days_of_week: list[int]):
+        return await self.grant_room_shift_access(db, user_id, room_id, shifts, days_of_week)
+
     async def list_room_shift_access(self, db, user_id: int):
         result = await db.execute(
             select(UserRoomShiftAccess)
@@ -144,6 +147,9 @@ class AuthService:
         )
         return list(result.scalars().all())
 
+    async def list_user_schedule(self, db, user_id: int):
+        return await self.list_room_shift_access(db, user_id)
+
     async def list_room_occupancy(self, db, room_id: int):
         result = await db.execute(
             select(UserRoomShiftAccess)
@@ -151,6 +157,9 @@ class AuthService:
             .order_by(UserRoomShiftAccess.day_of_week.asc(), UserRoomShiftAccess.shift_number.asc())
         )
         return list(result.scalars().all())
+
+    async def list_room_schedule(self, db, room_id: int):
+        return await self.list_room_occupancy(db, room_id)
 
     async def revoke_room_shift_access(self, db, user_id: int, room_id: int, shift_number: int, day_of_week: int):
         result = await db.execute(
@@ -163,9 +172,12 @@ class AuthService:
         )
         access = result.scalar_one_or_none()
         if not access:
-            raise ValueError("Permission not found")
+            raise ValueError("Schedule entry not found")
 
         await db.delete(access)
         await db.commit()
+
+    async def remove_user_schedule_entry(self, db, user_id: int, room_id: int, shift_number: int, day_of_week: int):
+        await self.revoke_room_shift_access(db, user_id, room_id, shift_number, day_of_week)
      
 auth_service = AuthService()
