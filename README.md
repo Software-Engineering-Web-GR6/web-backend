@@ -1,40 +1,40 @@
 # Smart Classroom Backend
 
-Backend cho hệ thống giám sát và điều khiển phòng học thông minh.
+Backend cho he thong giam sat va dieu khien phong hoc thong minh.
 
-## Chức năng chính
+## Chuc nang chinh
 
-- Đăng nhập bằng JWT
-- Quản lý phòng học
-- Nhận dữ liệu cảm biến
-- Điều khiển thiết bị
-- Tự động hóa theo rule
-- Cảnh báo và dashboard
-- Phân quyền theo `room + shift + day`
-- Chế độ `tự động / thủ công` theo từng phòng
-- Đổi mật khẩu cho tài khoản đang đăng nhập
+- Dang nhap bang JWT
+- Quan ly phong hoc
+- Nhan du lieu cam bien
+- Dieu khien thiet bi
+- Tu dong hoa theo rule
+- Canh bao va dashboard
+- Thoi khoa bieu theo `room + shift + day`
+- Che do `tu dong / thu cong` theo tung phong
+- Doi mat khau cho tai khoan dang dang nhap
 
-## Yêu cầu
+## Yeu cau
 
 - Python 3.11+
 - `pip`
 
-Kiểm tra nhanh:
+Kiem tra nhanh:
 
 ```bash
 python --version
 pip --version
 ```
 
-## Cài đặt
+## Cai dat
 
-### 1. Vào thư mục backend
+### 1. Vao thu muc backend
 
 ```cmd
 cd /d e:\baitapCNPM\backend
 ```
 
-### 2. Tạo virtual environment
+### 2. Tao virtual environment
 
 Windows CMD:
 
@@ -50,15 +50,15 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-### 3. Cài dependencies
+### 3. Cai dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Tạo file môi trường
+### 4. Tao file moi truong
 
-Nếu chưa có `.env.example`, bạn có thể tự tạo file `.env` tối thiểu như sau:
+Copy `.env.example` thanh `.env`, hoac tao file toi thieu nhu sau:
 
 ```env
 SECRET_KEY=change-this-secret-key
@@ -66,9 +66,9 @@ DATABASE_URL=sqlite+aiosqlite:///./smart_classroom.db
 ACCESS_TOKEN_EXPIRE_MINUTES=120
 ```
 
-## Chạy backend
+## Chay backend
 
-Nếu đã có sẵn môi trường:
+Neu da co san moi truong:
 
 ```cmd
 cd /d e:\baitapCNPM\backend
@@ -76,20 +76,27 @@ cd /d e:\baitapCNPM\backend
 uvicorn main:app --reload
 ```
 
-URL mặc định:
+Dia chi mac dinh:
 
 - API docs: `http://127.0.0.1:8000/docs`
 - Health: `http://127.0.0.1:8000/health`
 - WebSocket alerts: `ws://127.0.0.1:8000/ws/alerts`
 
-## Tài khoản mặc định
+## Tai khoan mac dinh
 
-Admin được seed tự động:
+Admin duoc seed tu dong:
 
 - Email: `admin@example.com`
 - Password: `admin123`
 
-Đăng nhập:
+Hai user demo co thoi khoa bieu mau cung duoc seed tu dong:
+
+- Email: `demo.user1@example.com`
+- Password: `user12345`
+- Email: `demo.user2@example.com`
+- Password: `user12345`
+
+Dang nhap:
 
 ```http
 POST /api/v1/auth/login
@@ -99,19 +106,19 @@ Content-Type: application/x-www-form-urlencoded
 Trong Swagger:
 
 - `username` = email
-- `password` = mật khẩu
+- `password` = mat khau
 
-## Phân quyền theo phòng, ca, ngày
+## Thoi khoa bieu theo phong, ca, ngay
 
-User thường chỉ được xem hoặc điều khiển phòng khi đồng thời đúng:
+User thuong chi duoc xem hoac dieu khien phong khi trong thoi khoa bieu hien tai co dung:
 
 - `room_id`
 - `shift_number`
 - `day_of_week`
 
-Admin được bỏ qua kiểm tra này.
+Admin duoc bo qua kiem tra nay.
 
-Khung giờ 6 ca:
+Khung gio 6 ca:
 
 - Ca 1: `07:00 - 09:35`
 - Ca 2: `09:35 - 12:00`
@@ -120,9 +127,9 @@ Khung giờ 6 ca:
 - Ca 5: `18:15 - 19:50`
 - Ca 6: `19:55 - 21:30`
 
-`day_of_week` dùng chuẩn Python: `0=Monday ... 6=Sunday`
+`day_of_week` dung chuan Python: `0=Monday ... 6=Sunday`
 
-### API phân quyền
+### API thoi khoa bieu
 
 ```http
 POST /api/v1/auth/users/{user_id}/room-access
@@ -151,20 +158,25 @@ GET /api/v1/auth/rooms/{room_id}/room-access
 DELETE /api/v1/auth/users/{user_id}/room-access?room_id=1&shift_number=2&day_of_week=0
 ```
 
-## Thiết bị và tự động hóa
+Luu y:
 
-Mỗi phòng hiện được seed:
+- Cac endpoint tren hien van giu ten `room-access` de tuong thich voi code dang chay.
+- Ve mat nghiep vu, moi ban ghi `room-access` duoc hieu la mot o trong thoi khoa bieu cua user.
 
-- 4 quạt
-- 4 đèn
-- 3 điều hòa
+## Thiet bi va tu dong hoa
 
-Chế độ hoạt động của phòng:
+Moi phong hien duoc seed:
 
-- `auto_control_enabled = true`: cho phép automation rules chạy khi ingest sensor
-- `auto_control_enabled = false`: phòng ở chế độ thủ công, backend sẽ bỏ qua automation
+- 4 quat
+- 4 den
+- 3 dieu hoa
 
-API cập nhật mode:
+Che do hoat dong cua phong:
+
+- `auto_control_enabled = true`: cho phep automation rules chay khi ingest sensor
+- `auto_control_enabled = false`: phong o che do thu cong, backend se bo qua automation
+
+API cap nhat mode:
 
 ```http
 PUT /api/v1/rooms/{room_id}/automation-mode
@@ -175,14 +187,14 @@ Content-Type: application/json
 }
 ```
 
-Lưu ý:
+Luu y:
 
-- Khi chuyển phòng sang `manual`, toàn bộ rules của phòng sẽ bị tắt theo.
-- Khi rules của phòng được bật lại, mode của phòng cũng được đồng bộ lại theo backend.
+- Khi chuyen phong sang `manual`, toan bo rules cua phong se bi tat theo.
+- Khi rules cua phong duoc bat lai, mode cua phong cung duoc dong bo lai theo backend.
 
-## Đổi mật khẩu
+## Doi mat khau
 
-Tài khoản đang đăng nhập có thể đổi mật khẩu bằng API:
+Tai khoan dang dang nhap co the doi mat khau bang API:
 
 ```http
 PUT /api/v1/auth/me/password
@@ -198,12 +210,12 @@ Content-Type: application/json
 
 File `sensor_simulator.py`:
 
-- đăng nhập bằng admin mặc định
-- lấy toàn bộ danh sách phòng từ backend
-- sinh dữ liệu giả cho tất cả phòng
-- phản ứng theo trạng thái thiết bị từng phòng
+- Dang nhap bang admin mac dinh
+- Lay toan bo danh sach phong tu backend
+- Sinh du lieu gia cho tat ca phong
+- Phan ung theo trang thai thiet bi tung phong
 
-Chạy:
+Chay:
 
 ```cmd
 cd /d e:\baitapCNPM\backend
@@ -211,21 +223,21 @@ cd /d e:\baitapCNPM\backend
 python sensor_simulator.py
 ```
 
-Nếu backend đang chạy, simulator sẽ bơm dữ liệu liên tục vào:
+Neu backend dang chay, simulator se bom du lieu lien tuc vao:
 
 ```http
 POST /api/v1/sensors/ingest
 ```
 
-## Chạy test
+## Chay test
 
-Chạy toàn bộ:
+Chay toan bo:
 
 ```bash
 pytest -q
 ```
 
-Ví dụ:
+Vi du:
 
 ```bash
 pytest -q tests/test_room_shift_access.py
@@ -234,7 +246,7 @@ pytest -q tests/test_api_sensors.py
 pytest -q tests/test_api_alerts.py
 ```
 
-## Cấu trúc chính
+## Cau truc chinh
 
 ```text
 app/
@@ -247,5 +259,4 @@ app/
 |-- schemas/            # Pydantic schemas
 |-- services/           # business logic layer
 `-- websocket/          # realtime broadcast
-
 ```
