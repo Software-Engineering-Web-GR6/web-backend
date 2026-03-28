@@ -35,7 +35,7 @@ PASSWORD = "admin123"
 INTERVAL_SECONDS = 2
 REQUEST_TIMEOUT = 5
 
-TEMP_MIN = 20.0
+TEMP_MIN = 18.0
 TEMP_MAX = 40.0
 HUM_MIN = 35.0
 HUM_MAX = 85.0
@@ -45,6 +45,24 @@ CO2_MAX = 1600.0
 OUTDOOR_TEMP = 30.0
 OUTDOOR_HUM = 63.0
 OUTDOOR_CO2 = 470.0
+INDOOR_HUM_BASELINE = 56.0
+
+
+class TokenManager:
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._token: str | None = None
+
+    def get(self) -> str:
+        with self._lock:
+            if not self._token:
+                self._token = get_access_token()
+            return self._token
+
+    def refresh(self) -> str:
+        with self._lock:
+            self._token = get_access_token()
+            return self._token
 
 
 def clamp(value: float, minimum: float, maximum: float) -> float:
@@ -119,6 +137,11 @@ def get_device_states(token: str, room_id: int) -> dict[str, float | bool]:
     }
 
 
+def is_unauthorized(error: requests.HTTPError) -> bool:
+    response = getattr(error, "response", None)
+    return bool(response is not None and response.status_code == 401)
+
+
 def create_initial_environment(seed_offset: int) -> tuple[float, float, float]:
     randomizer = random.Random(seed_offset)
     temp = 27.0 + randomizer.uniform(-1.5, 2.5)
@@ -142,18 +165,25 @@ def evolve_environment(
     window_open = bool(states.get("window_open"))
     ac_target_temp = float(states.get("ac_target_temp", 24.0))
 
-    temp_delta = random.uniform(0.05, 0.25)
-    hum_delta = random.uniform(-0.2, 0.4)
+    base_temp_target = OUTDOOR_TEMP - 2.5
+    base_hum_target = INDOOR_HUM_BASELINE if not window_open else OUTDOOR_HUM
+    temp_delta = (base_temp_target - temp) * 0.16 + random.uniform(-0.12, 0.12)
+    hum_delta = (base_hum_target - humidity) * 0.12 + random.uniform(-0.18, 0.18)
     co2_delta = random.uniform(8, 28)
 
     if ac_on:
-        temp_delta += (ac_target_temp - temp) * 0.28
-        hum_delta -= random.uniform(0.3, 0.8)
+        temp_delta = (ac_target_temp - temp) * 0.42 + random.uniform(-0.08, 0.08)
+        hum_delta += (48.0 - humidity) * 0.08 - random.uniform(0.05, 0.18)
         co2_delta -= random.uniform(5, 15)
 
     if fan_on:
-        temp_delta -= random.uniform(0.2, 0.5)
-        hum_delta -= random.uniform(0.1, 0.3)
+        if ac_on:
+            temp_delta += (ac_target_temp - temp) * 0.08 + random.uniform(-0.04, 0.04)
+        elif temp > 24.0:
+            temp_delta -= random.uniform(0.05, 0.18)
+        else:
+            temp_delta += random.uniform(-0.05, 0.05)
+        hum_delta += (52.0 - humidity) * 0.04 - random.uniform(0.02, 0.08)
         co2_delta -= random.uniform(20, 55)
 
     if window_open:
@@ -162,6 +192,9 @@ def evolve_environment(
         co2_delta += (OUTDOOR_CO2 - co2) * 0.28
 
     temp = clamp(temp + temp_delta, TEMP_MIN, TEMP_MAX)
+    if ac_on and abs(temp - ac_target_temp) < 0.5:
+        temp = clamp(ac_target_temp + random.uniform(-0.2, 0.2), TEMP_MIN, TEMP_MAX)
+
     humidity = clamp(humidity + hum_delta, HUM_MIN, HUM_MAX)
     co2 = clamp(co2 + co2_delta, CO2_MIN, CO2_MAX)
     return temp, humidity, co2
@@ -197,7 +230,7 @@ def send_reading(
 
 
 def run_room_simulator(
-    token: str,
+    token_manager: TokenManager,
     room_id: int,
     initial_environment: tuple[float, float, float],
     stop_event: threading.Event,
@@ -207,6 +240,7 @@ def run_room_simulator(
 
     while not stop_event.is_set():
         try:
+            token = token_manager.get()
             states = get_device_states(token, room_id)
             temp, humidity, co2 = evolve_environment(
                 temp=temp,
@@ -216,6 +250,13 @@ def run_room_simulator(
             )
             send_reading(token, room_id, temp, humidity, co2)
         except requests.HTTPError as error:
+            if is_unauthorized(error):
+                token_manager.refresh()
+                print(
+                    f"[{datetime.now().isoformat()}] room={room_id} Token expired, refreshed token",
+                    flush=True,
+                )
+                continue
             print(
                 f"[{datetime.now().isoformat()}] room={room_id} HTTP error: {error}",
                 flush=True,
@@ -236,7 +277,8 @@ def run_room_simulator(
 
 
 def main() -> None:
-    token = get_access_token()
+    token_manager = TokenManager()
+    token = token_manager.get()
     room_ids = get_room_ids(token)
     if not room_ids:
         raise RuntimeError("No rooms returned by backend")
@@ -263,7 +305,7 @@ def main() -> None:
     threads = [
         threading.Thread(
             target=run_room_simulator,
-            args=(token, room_id, environments[room_id], stop_event),
+            args=(token_manager, room_id, environments[room_id], stop_event),
             name=f"room-simulator-{room_id}",
             daemon=True,
         )
