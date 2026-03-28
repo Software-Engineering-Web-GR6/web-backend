@@ -1,40 +1,40 @@
 # Smart Classroom Backend
 
-Backend cho he thong giam sat va dieu khien phong hoc thong minh.
+Backend cho hệ thống giám sát và điều khiển phòng học thông minh.
 
-## Chuc nang chinh
+## Chức năng chính
 
-- Dang nhap bang JWT
-- Quan ly phong hoc
-- Nhan du lieu cam bien
-- Dieu khien thiet bi
-- Tu dong hoa theo rule
-- Canh bao va dashboard
-- Thoi khoa bieu theo `room + shift + day`
-- Che do `tu dong / thu cong` theo tung phong
-- Doi mat khau cho tai khoan dang dang nhap
+- Đăng nhập bằng JWT
+- Quản lý phòng học
+- Nhận dữ liệu cảm biến
+- Điều khiển thiết bị
+- Tự động hóa theo rule
+- Cảnh báo và dashboard
+- Thời khóa biểu theo `room + shift + day`
+- Chế độ `tự động / thủ công` theo từng phòng
+- Đổi mật khẩu cho tài khoản đang đăng nhập
 
-## Yeu cau
+## Yêu cầu
 
 - Python 3.11+
 - `pip`
 
-Kiem tra nhanh:
+Kiểm tra nhanh:
 
 ```bash
 python --version
 pip --version
 ```
 
-## Cai dat
+## Cài đặt
 
-### 1. Vao thu muc backend
+### 1. Vào thư mục backend
 
 ```cmd
 cd /d e:\baitapCNPM\backend
 ```
 
-### 2. Tao virtual environment
+### 2. Tạo virtual environment
 
 Windows CMD:
 
@@ -50,15 +50,15 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-### 3. Cai dependencies
+### 3. Cài dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Tao file moi truong
+### 4. Tạo file môi trường
 
-Copy `.env.example` thanh `.env`, hoac tao file toi thieu nhu sau:
+Copy `.env.example` thành `.env`, hoặc tạo file tối thiểu như sau:
 
 ```env
 SECRET_KEY=change-this-secret-key
@@ -66,9 +66,9 @@ DATABASE_URL=sqlite+aiosqlite:///./smart_classroom.db
 ACCESS_TOKEN_EXPIRE_MINUTES=120
 ```
 
-## Chay backend
+## Chạy backend
 
-Neu da co san moi truong:
+Nếu đã có sẵn môi trường:
 
 ```cmd
 cd /d e:\baitapCNPM\backend
@@ -76,27 +76,27 @@ cd /d e:\baitapCNPM\backend
 uvicorn main:app --reload
 ```
 
-Dia chi mac dinh:
+Địa chỉ mặc định:
 
 - API docs: `http://127.0.0.1:8000/docs`
 - Health: `http://127.0.0.1:8000/health`
 - WebSocket alerts: `ws://127.0.0.1:8000/ws/alerts`
 
-## Tai khoan mac dinh
+## Tài khoản mặc định
 
-Admin duoc seed tu dong:
+Admin được seed tự động:
 
 - Email: `admin@example.com`
 - Password: `admin123`
 
-Hai user demo co thoi khoa bieu mau cung duoc seed tu dong:
+Hai user demo có thời khóa biểu mẫu cũng được seed tự động:
 
 - Email: `demo.user1@example.com`
 - Password: `user12345`
 - Email: `demo.user2@example.com`
 - Password: `user12345`
 
-Dang nhap:
+Đăng nhập:
 
 ```http
 POST /api/v1/auth/login
@@ -106,19 +106,19 @@ Content-Type: application/x-www-form-urlencoded
 Trong Swagger:
 
 - `username` = email
-- `password` = mat khau
+- `password` = mật khẩu
 
-## Thoi khoa bieu theo phong, ca, ngay
+## Thời khóa biểu theo phòng, ca, ngày
 
-User thuong chi duoc xem hoac dieu khien phong khi trong thoi khoa bieu hien tai co dung:
+User thường chỉ được xem hoặc điều khiển phòng khi trong thời khóa biểu hiện tại có đúng:
 
 - `room_id`
 - `shift_number`
 - `day_of_week`
 
-Admin duoc bo qua kiem tra nay.
+Admin được bỏ qua kiểm tra này.
 
-Khung gio 6 ca:
+Khung giờ 6 ca:
 
 - Ca 1: `07:00 - 09:35`
 - Ca 2: `09:35 - 12:00`
@@ -127,12 +127,14 @@ Khung gio 6 ca:
 - Ca 5: `18:15 - 19:50`
 - Ca 6: `19:55 - 21:30`
 
-`day_of_week` dung chuan Python: `0=Monday ... 6=Sunday`
+`day_of_week` dùng chuẩn Python: `0=Monday ... 6=Sunday`
 
-### API thoi khoa bieu
+### API thời khóa biểu
+
+API mới theo nghiệp vụ:
 
 ```http
-POST /api/v1/auth/users/{user_id}/room-access
+POST /api/v1/auth/users/{user_id}/schedule
 Content-Type: application/json
 
 {
@@ -143,40 +145,40 @@ Content-Type: application/json
 ```
 
 ```http
-GET /api/v1/auth/users/{user_id}/room-access
+GET /api/v1/auth/users/{user_id}/schedule
 ```
 
 ```http
-GET /api/v1/auth/me/room-access
+GET /api/v1/auth/me/schedule
 ```
 
 ```http
-GET /api/v1/auth/rooms/{room_id}/room-access
+GET /api/v1/auth/rooms/{room_id}/schedule
 ```
 
 ```http
-DELETE /api/v1/auth/users/{user_id}/room-access?room_id=1&shift_number=2&day_of_week=0
+DELETE /api/v1/auth/users/{user_id}/schedule?room_id=1&shift_number=2&day_of_week=0
 ```
 
-Luu y:
+Tương thích ngược:
 
-- Cac endpoint tren hien van giu ten `room-access` de tuong thich voi code dang chay.
-- Ve mat nghiep vu, moi ban ghi `room-access` duoc hieu la mot o trong thoi khoa bieu cua user.
+- Hệ thống hiện vẫn giữ các endpoint `room-access` cũ để không làm vỡ code đang chạy.
+- Về mặt nghiệp vụ, mỗi bản ghi `room-access` được hiểu là một ô trong thời khóa biểu của user.
 
-## Thiet bi va tu dong hoa
+## Thiết bị và tự động hóa
 
-Moi phong hien duoc seed:
+Mỗi phòng hiện được seed:
 
-- 4 quat
-- 4 den
-- 3 dieu hoa
+- 4 quạt
+- 4 đèn
+- 3 điều hòa
 
-Che do hoat dong cua phong:
+Chế độ hoạt động của phòng:
 
-- `auto_control_enabled = true`: cho phep automation rules chay khi ingest sensor
-- `auto_control_enabled = false`: phong o che do thu cong, backend se bo qua automation
+- `auto_control_enabled = true`: cho phép automation rules chạy khi ingest sensor
+- `auto_control_enabled = false`: phòng ở chế độ thủ công, backend sẽ bỏ qua automation
 
-API cap nhat mode:
+API cập nhật mode:
 
 ```http
 PUT /api/v1/rooms/{room_id}/automation-mode
@@ -187,14 +189,14 @@ Content-Type: application/json
 }
 ```
 
-Luu y:
+Lưu ý:
 
-- Khi chuyen phong sang `manual`, toan bo rules cua phong se bi tat theo.
-- Khi rules cua phong duoc bat lai, mode cua phong cung duoc dong bo lai theo backend.
+- Khi chuyển phòng sang `manual`, toàn bộ rules của phòng sẽ bị tắt theo.
+- Khi rules của phòng được bật lại, mode của phòng cũng được đồng bộ lại theo backend.
 
-## Doi mat khau
+## Đổi mật khẩu
 
-Tai khoan dang dang nhap co the doi mat khau bang API:
+Tài khoản đang đăng nhập có thể đổi mật khẩu bằng API:
 
 ```http
 PUT /api/v1/auth/me/password
@@ -210,12 +212,13 @@ Content-Type: application/json
 
 File `sensor_simulator.py`:
 
-- Dang nhap bang admin mac dinh
-- Lay toan bo danh sach phong tu backend
-- Sinh du lieu gia cho tat ca phong
-- Phan ung theo trang thai thiet bi tung phong
+- Đăng nhập bằng admin mặc định
+- Lấy toàn bộ danh sách phòng từ backend
+- Chạy giả lập song song cho từng phòng
+- Phản ứng theo trạng thái thiết bị từng phòng
+- Tự reset lịch sử sensor cũ trước khi bơm dữ liệu mới
 
-Chay:
+Chạy:
 
 ```cmd
 cd /d e:\baitapCNPM\backend
@@ -223,21 +226,21 @@ cd /d e:\baitapCNPM\backend
 python sensor_simulator.py
 ```
 
-Neu backend dang chay, simulator se bom du lieu lien tuc vao:
+Nếu backend đang chạy, simulator sẽ bơm dữ liệu liên tục vào:
 
 ```http
 POST /api/v1/sensors/ingest
 ```
 
-## Chay test
+## Chạy test
 
-Chay toan bo:
+Chạy toàn bộ:
 
 ```bash
 pytest -q
 ```
 
-Vi du:
+Ví dụ:
 
 ```bash
 pytest -q tests/test_room_shift_access.py
@@ -246,7 +249,7 @@ pytest -q tests/test_api_sensors.py
 pytest -q tests/test_api_alerts.py
 ```
 
-## Cau truc chinh
+## Cấu trúc chính
 
 ```text
 app/
