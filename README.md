@@ -1,10 +1,10 @@
 # Smart Classroom Backend
 
-Backend cho hệ thống giám sát và điều khiển phòng học thông minh.
+Backend FastAPI cho hệ thống giám sát và điều khiển phòng học thông minh.
 
-## Chức năng chính
+## Tính năng chính
 
-- Đăng nhập bằng JWT
+- Đăng nhập JWT
 - Quản lý phòng học
 - Nhận dữ liệu cảm biến
 - Điều khiển thiết bị
@@ -30,8 +30,8 @@ pip --version
 
 ### 1. Vào thư mục backend
 
-```cmd
-cd /d e:\baitapCNPM\backend
+```powershell
+cd e:\baitapCNPM\backend
 ```
 
 ### 2. Tạo virtual environment
@@ -58,7 +58,7 @@ pip install -r requirements.txt
 
 ### 4. Tạo file môi trường
 
-Copy `.env.example` thành `.env`, hoặc tạo file tối thiểu như sau:
+Copy `.env.example` thành `.env`, hoặc dùng cấu hình tối thiểu:
 
 ```env
 SECRET_KEY=change-this-secret-key
@@ -68,11 +68,9 @@ ACCESS_TOKEN_EXPIRE_MINUTES=120
 
 ## Chạy backend
 
-Nếu đã có sẵn môi trường:
-
-```cmd
-cd /d e:\baitapCNPM\backend
-.venv\Scripts\activate.bat
+```powershell
+cd e:\baitapCNPM\backend
+.\.venv\Scripts\Activate.ps1
 uvicorn main:app --reload
 ```
 
@@ -89,7 +87,7 @@ Admin được seed tự động:
 - Email: `admin@example.com`
 - Password: `admin123`
 
-Hai user demo có thời khóa biểu mẫu cũng được seed tự động:
+Hai user demo cũng được seed tự động:
 
 - Email: `demo.user1@example.com`
 - Password: `user12345`
@@ -108,13 +106,15 @@ Trong Swagger:
 - `username` = email
 - `password` = mật khẩu
 
-## Thời khóa biểu theo phòng, ca, ngày
+## Quyền truy cập theo lịch
 
 User thường chỉ được xem hoặc điều khiển phòng khi trong thời khóa biểu hiện tại có đúng:
 
 - `room_id`
 - `shift_number`
 - `day_of_week`
+
+Điều này áp dụng cho các luồng đọc dữ liệu phòng, thiết bị, dashboard và cảnh báo theo phòng hiện tại.
 
 Admin được bỏ qua kiểm tra này.
 
@@ -129,9 +129,7 @@ Khung giờ 6 ca:
 
 `day_of_week` dùng chuẩn Python: `0=Monday ... 6=Sunday`
 
-### API thời khóa biểu
-
-API mới theo nghiệp vụ:
+## API thời khóa biểu
 
 ```http
 POST /api/v1/auth/users/{user_id}/schedule
@@ -162,7 +160,7 @@ DELETE /api/v1/auth/users/{user_id}/schedule?room_id=1&shift_number=2&day_of_wee
 
 Tương thích ngược:
 
-- Hệ thống hiện vẫn giữ các endpoint `room-access` cũ để không làm vỡ code đang chạy.
+- Hệ thống vẫn giữ các endpoint `room-access` cũ để không làm vỡ code đang chạy.
 - Về mặt nghiệp vụ, mỗi bản ghi `room-access` được hiểu là một ô trong thời khóa biểu của user.
 
 ## Thiết bị và tự động hóa
@@ -194,6 +192,23 @@ Lưu ý:
 - Khi chuyển phòng sang `manual`, toàn bộ rules của phòng sẽ bị tắt theo.
 - Khi rules của phòng được bật lại, mode của phòng cũng được đồng bộ lại theo backend.
 
+## Tương thích SQLite cũ
+
+Backend hiện có bước migrate schema SQLite cũ cho một số thay đổi legacy đã biết, ví dụ:
+
+- `rooms.building`
+- `rooms.auto_control_enabled`
+- `devices.target_temp`
+- `users.full_name`
+- `users.created_at`
+
+Mục tiêu là để máy khác pull code mới về vẫn chạy được với file SQLite cũ mà không phải xóa DB ngay từ đầu.
+
+Lưu ý:
+
+- Đây chưa phải hệ thống migration đầy đủ kiểu Alembic.
+- Nếu sau này schema đổi lớn hơn, nên bổ sung migration bài bản.
+
 ## Đổi mật khẩu
 
 Tài khoản đang đăng nhập có thể đổi mật khẩu bằng API:
@@ -220,9 +235,9 @@ File `sensor_simulator.py`:
 
 Chạy:
 
-```cmd
-cd /d e:\baitapCNPM\backend
-.venv\Scripts\activate.bat
+```powershell
+cd e:\baitapCNPM\backend
+.\.venv\Scripts\Activate.ps1
 python sensor_simulator.py
 ```
 
@@ -243,11 +258,21 @@ pytest -q
 Ví dụ:
 
 ```bash
-pytest -q tests/test_room_shift_access.py
 pytest -q tests/test_api_auth.py
-pytest -q tests/test_api_sensors.py
 pytest -q tests/test_api_alerts.py
+pytest -q tests/test_api_rooms.py
+pytest -q tests/test_db_migrations.py
 ```
+
+## Docker
+
+Container hiện chạy:
+
+```bash
+python -m uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+Không dùng `--reload` trong `Dockerfile`.
 
 ## Cấu trúc chính
 
