@@ -6,6 +6,9 @@ class RoomService:
     async def list_all(self, db):
         return await room_repository.list_all(db)
 
+    async def list_by_ids(self, db, room_ids: list[int]):
+        return await room_repository.list_by_ids(db, room_ids)
+
     async def set_automation_mode(self, db, room_id: int, enabled: bool):
         room = await room_repository.get_by_id(db, room_id)
         if not room:

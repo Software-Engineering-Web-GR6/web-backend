@@ -1,18 +1,27 @@
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.router import api_router
 from app.core.config import settings
-from app.db.session import init_db, AsyncSessionLocal
+from app.db.session import bootstrap_database
 from app.db.seed import seed_data
 from app.websocket.manager import ws_manager
 from fastapi.responses import RedirectResponse, Response
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+)
+
+logger = logging.getLogger(__name__)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await init_db()
-    async with AsyncSessionLocal() as session:
-        await seed_data(session)
+    logger.info("Starting application bootstrap")
+    await bootstrap_database(seed_data)
+    logger.info("Application bootstrap completed successfully")
     yield
 
 

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.dependencies import get_current_user, get_db_session, require_device_access
+from app.core.dependencies import get_db_session, require_device_access, require_room_access
 from app.schemas.device import DeviceResponse, DeviceControlRequest, DeviceTemperatureUpdateRequest
 from app.services.device_service import device_service
 
@@ -11,7 +11,7 @@ router = APIRouter()
 async def get_devices(
     room_id: int,
     db: AsyncSession = Depends(get_db_session),
-    _: dict = Depends(get_current_user),
+    _: dict = Depends(require_room_access),
 ):
     return await device_service.get_by_room(db, room_id)
 

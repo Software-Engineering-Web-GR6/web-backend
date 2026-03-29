@@ -125,6 +125,10 @@ def get_device_states(token: str, room_id: int) -> dict[str, float | bool]:
         device["device_type"] == "light" and device["state"] == "ON"
         for device in devices
     )
+    window_open = any(
+        device["device_type"] == "window" and device["state"] == "OPEN"
+        for device in devices
+    )
     ac_target_temp = (
         sum(device.get("target_temp", 24) for device in ac_devices_on) / len(ac_devices_on)
         if ac_devices_on else 24.0
@@ -133,6 +137,7 @@ def get_device_states(token: str, room_id: int) -> dict[str, float | bool]:
         "fan_on": fan_on,
         "ac_on": len(ac_devices_on) > 0,
         "light_on": light_on,
+        "window_open": window_open,
         "ac_target_temp": ac_target_temp,
     }
 

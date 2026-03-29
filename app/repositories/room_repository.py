@@ -14,6 +14,16 @@ class RoomRepository(BaseRepository):
         )
         return list(result.scalars().all())
 
+    async def list_by_ids(self, db, room_ids: list[int]):
+        if not room_ids:
+            return []
+        result = await db.execute(
+            select(Room)
+            .where(Room.id.in_(room_ids))
+            .order_by(Room.building.asc(), Room.name.asc(), Room.id.asc())
+        )
+        return list(result.scalars().all())
+
     async def get_by_id(self, db, room_id: int):
         result = await db.execute(select(Room).where(Room.id == room_id))
         return result.scalar_one_or_none()

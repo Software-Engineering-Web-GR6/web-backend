@@ -1,3 +1,8 @@
+from datetime import datetime as real_datetime
+
+from app.core import dependencies as deps
+
+
 class TestRoomsAPI:
     async def test_list_rooms_requires_auth(self, client):
         resp = await client.get("/api/v1/rooms")
@@ -27,6 +32,53 @@ class TestRoomsAPI:
         assert buildings.count("B") == 3
         assert buildings.count("E") == 2
         assert all("auto_control_enabled" in room for room in rooms)
+
+    async def test_regular_user_only_sees_rooms_in_current_schedule_window(self, client, auth_headers, monkeypatch):
+        create_user = await client.post(
+            "/api/v1/auth/users",
+            json={
+                "full_name": "Room User",
+                "email": "room-user@example.com",
+                "password": "user12345",
+            },
+            headers=auth_headers,
+        )
+        assert create_user.status_code == 201
+        user_id = create_user.json()["id"]
+
+        grant_access = await client.post(
+            f"/api/v1/auth/users/{user_id}/schedule",
+            json={"room_id": 1, "shifts": [2], "days_of_week": [0]},
+            headers=auth_headers,
+        )
+        assert grant_access.status_code == 200
+
+        login_user = await client.post(
+            "/api/v1/auth/login",
+            data={"username": "room-user@example.com", "password": "user12345"},
+        )
+        assert login_user.status_code == 200
+        user_headers = {"Authorization": f"Bearer {login_user.json()['access_token']}"}
+
+        class _FixedDateTime:
+            @classmethod
+            def now(cls):
+                return real_datetime(2026, 3, 16, 10, 0, 0)
+
+        monkeypatch.setattr(deps, "datetime", _FixedDateTime)
+        monkeypatch.setattr(deps, "get_current_shift", lambda now=None: 2)
+
+        resp = await client.get("/api/v1/rooms", headers=user_headers)
+        assert resp.status_code == 200
+        assert resp.json() == [
+            {
+                "id": 1,
+                "name": "Room A101",
+                "building": "A",
+                "location": "Building A - Floor 1",
+                "auto_control_enabled": True,
+            }
+        ]
 
     async def test_admin_can_update_room_automation_mode(self, client, auth_headers):
         resp = await client.put(
