@@ -168,6 +168,75 @@ class TestDevicesAPI:
         assert len([device for device in devices if device["device_type"] == "light"]) == 4
         assert len([device for device in devices if device["device_type"] == "air_conditioner"]) == 3
 
+    async def test_regular_user_cannot_list_devices_without_current_room_access(self, client, auth_headers, monkeypatch):
+        create_user = await client.post(
+            "/api/v1/auth/users",
+            json={
+                "full_name": "Device User",
+                "email": "device-user@example.com",
+                "password": "user12345",
+            },
+            headers=auth_headers,
+        )
+        assert create_user.status_code == 201
+
+        login_user = await client.post(
+            "/api/v1/auth/login",
+            data={"username": "device-user@example.com", "password": "user12345"},
+        )
+        assert login_user.status_code == 200
+        user_headers = {"Authorization": f"Bearer {login_user.json()['access_token']}"}
+
+        class _FixedDateTime:
+            @classmethod
+            def now(cls):
+                return real_datetime(2026, 3, 16, 10, 0, 0)
+
+        monkeypatch.setattr(deps, "datetime", _FixedDateTime)
+        monkeypatch.setattr(deps, "get_current_shift", lambda now=None: 2)
+
+        resp = await client.get("/api/v1/devices/1", headers=user_headers)
+        assert resp.status_code == 403
+
+    async def test_regular_user_can_list_devices_for_current_room_access(self, client, auth_headers, monkeypatch):
+        create_user = await client.post(
+            "/api/v1/auth/users",
+            json={
+                "full_name": "Device Allowed User",
+                "email": "device-allowed@example.com",
+                "password": "user12345",
+            },
+            headers=auth_headers,
+        )
+        assert create_user.status_code == 201
+        user_id = create_user.json()["id"]
+
+        grant_access = await client.post(
+            f"/api/v1/auth/users/{user_id}/schedule",
+            json={"room_id": 1, "shifts": [2], "days_of_week": [0]},
+            headers=auth_headers,
+        )
+        assert grant_access.status_code == 200
+
+        login_user = await client.post(
+            "/api/v1/auth/login",
+            data={"username": "device-allowed@example.com", "password": "user12345"},
+        )
+        assert login_user.status_code == 200
+        user_headers = {"Authorization": f"Bearer {login_user.json()['access_token']}"}
+
+        class _FixedDateTime:
+            @classmethod
+            def now(cls):
+                return real_datetime(2026, 3, 16, 10, 0, 0)
+
+        monkeypatch.setattr(deps, "datetime", _FixedDateTime)
+        monkeypatch.setattr(deps, "get_current_shift", lambda now=None: 2)
+
+        resp = await client.get("/api/v1/devices/1", headers=user_headers)
+        assert resp.status_code == 200
+        assert len(resp.json()) == 11
+
     async def test_control_device(self, client, auth_headers):
         devices = (await client.get("/api/v1/devices/1", headers=auth_headers)).json()
         fan = next(d for d in devices if d["device_type"] == "fan")
