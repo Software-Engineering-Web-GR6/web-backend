@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     MQTT_DEVICE_COMMAND_TOPIC_PREFIX: str = "smartclassrooms/devices"
     MQTT_CLIENT_ID: str = "smart-classroom-backend"
     MQTT_KEEPALIVE_SECONDS: int = 60
-    MQTT_DEVICE_ACK_TIMEOUT_SECONDS: float = 3.0
+    MQTT_DEVICE_ACK_TIMEOUT_SECONDS: float = 1.5
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
