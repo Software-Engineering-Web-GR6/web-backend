@@ -9,6 +9,7 @@ requests>=2.32.0
 pydantic[email]==2.9.2
 pydantic-settings==2.5.2
 python-multipart==0.0.9
+paho-mqtt==1.6.1
 
 # dev / test
 pytest>=9.0

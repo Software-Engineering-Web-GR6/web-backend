@@ -1,6 +1,8 @@
 from datetime import datetime as real_datetime
+from unittest.mock import AsyncMock
 
 from app.core import dependencies as deps
+from app.services.mqtt_service import mqtt_service
 
 
 class TestAlertsAPI:
@@ -248,6 +250,71 @@ class TestDevicesAPI:
         )
         assert resp.status_code == 200
         assert resp.json()["state"] == "ON"
+
+    async def test_control_device_publishes_mqtt_command(self, client, auth_headers, monkeypatch):
+        devices = (await client.get("/api/v1/devices/1", headers=auth_headers)).json()
+        fan = next(d for d in devices if d["device_type"] == "fan")
+
+        published = AsyncMock(return_value=True)
+        monkeypatch.setattr(mqtt_service, "publish_device_command", published)
+
+        resp = await client.post(
+            f"/api/v1/devices/{fan['id']}/control",
+            json={"action": "ON"},
+            headers=auth_headers,
+        )
+
+        assert resp.status_code == 200
+        published.assert_awaited_once_with(
+            room_id=fan["room_id"],
+            device_id=fan["id"],
+            device_type=fan["device_type"],
+            command="ON",
+            source="ADMIN",
+        )
+
+    async def test_update_temperature_publishes_mqtt_command(self, client, auth_headers, monkeypatch):
+        devices = (await client.get("/api/v1/devices/1", headers=auth_headers)).json()
+        ac = next(d for d in devices if d["device_type"] == "air_conditioner")
+
+        published = AsyncMock(return_value=True)
+        monkeypatch.setattr(mqtt_service, "publish_device_command", published)
+
+        resp = await client.put(
+            f"/api/v1/devices/{ac['id']}/temperature",
+            json={"target_temp": 22},
+            headers=auth_headers,
+        )
+
+        assert resp.status_code == 200
+        assert resp.json()["target_temp"] == 22
+        published.assert_awaited_once_with(
+            room_id=ac["room_id"],
+            device_id=ac["id"],
+            device_type=ac["device_type"],
+            command="SET_TEMPERATURE",
+            source="ADMIN",
+            target_temp=22,
+        )
+
+    async def test_control_device_returns_400_when_mqtt_ack_is_missing(self, client, auth_headers, monkeypatch):
+        devices = (await client.get("/api/v1/devices/1", headers=auth_headers)).json()
+        fan = next(d for d in devices if d["device_type"] == "fan")
+
+        monkeypatch.setattr(
+            mqtt_service,
+            "publish_device_command",
+            AsyncMock(return_value=False),
+        )
+
+        resp = await client.post(
+            f"/api/v1/devices/{fan['id']}/control",
+            json={"action": "ON"},
+            headers=auth_headers,
+        )
+
+        assert resp.status_code == 400
+        assert resp.json()["detail"] == "Device command was not acknowledged by MQTT consumer"
 
     async def test_control_invalid_action(self, client, auth_headers):
         devices = (await client.get("/api/v1/devices/1", headers=auth_headers)).json()

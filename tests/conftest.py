@@ -2,6 +2,7 @@ import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from unittest.mock import AsyncMock
 
 from app.db.session import Base
 from app.core.dependencies import get_db_session
@@ -20,6 +21,17 @@ async def setup_db():
     yield
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
+
+
+@pytest.fixture(autouse=True)
+def mock_mqtt_ack(monkeypatch):
+    from app.services.mqtt_service import mqtt_service
+
+    monkeypatch.setattr(
+        mqtt_service,
+        "publish_device_command",
+        AsyncMock(return_value=True),
+    )
 
 
 @pytest_asyncio.fixture

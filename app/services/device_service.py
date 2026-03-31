@@ -12,6 +12,18 @@ class DeviceService:
             raise ValueError("Device not found")
         if action not in {"ON", "OFF", "OPEN", "CLOSE"}:
             raise ValueError("Invalid action")
+        from app.services.mqtt_service import mqtt_service
+
+        published = await mqtt_service.publish_device_command(
+            room_id=device.room_id,
+            device_id=device.id,
+            device_type=device.device_type,
+            command=action,
+            source=source,
+        )
+        if not published:
+            raise ValueError("Device command was not acknowledged by MQTT consumer")
+
         updated = await device_repository.update_state(db, device, action)
         await action_log_repository.create(
             db,
@@ -23,7 +35,14 @@ class DeviceService:
         )
         return updated
 
-    async def update_temperature(self, db, device_id: int, target_temp: int):
+    async def update_temperature(
+        self,
+        db,
+        device_id: int,
+        target_temp: int,
+        source: str = "MANUAL",
+        description: str | None = None,
+    ):
         device = await device_repository.get_by_id(db, device_id)
         if not device:
             raise ValueError("Device not found")
@@ -32,14 +51,27 @@ class DeviceService:
         if target_temp < 16 or target_temp > 30:
             raise ValueError("Target temperature must be between 16 and 30")
 
+        from app.services.mqtt_service import mqtt_service
+
+        published = await mqtt_service.publish_device_command(
+            room_id=device.room_id,
+            device_id=device.id,
+            device_type=device.device_type,
+            command="SET_TEMPERATURE",
+            source=source,
+            target_temp=target_temp,
+        )
+        if not published:
+            raise ValueError("Device command was not acknowledged by MQTT consumer")
+
         updated = await device_repository.update_target_temp(db, device, target_temp)
         await action_log_repository.create(
             db,
             room_id=updated.room_id,
             device_id=updated.id,
             action=f"SET_TEMP_{target_temp}",
-            source="MANUAL",
-            description=f"Set AC target temperature to {target_temp}C",
+            source=source,
+            description=description or f"Set AC target temperature to {target_temp}C",
         )
         return updated
 

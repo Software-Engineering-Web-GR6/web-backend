@@ -47,6 +47,8 @@ async def update_device_temperature(
             db,
             device_id=device_id,
             target_temp=payload.target_temp,
+            source=current_user.get("role", "MANUAL").upper(),
+            description=f"Manual override by {current_user.get('email')}",
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
