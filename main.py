@@ -1,11 +1,13 @@
 import logging
 from contextlib import asynccontextmanager
+import asyncio
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.db.session import bootstrap_database
 from app.db.seed import seed_data
+from app.services.mqtt_service import mqtt_service
 from app.websocket.manager import ws_manager
 from fastapi.responses import RedirectResponse, Response
 
@@ -21,8 +23,10 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     logger.info("Starting application bootstrap")
     await bootstrap_database(seed_data)
+    mqtt_service.start(asyncio.get_running_loop())
     logger.info("Application bootstrap completed successfully")
     yield
+    mqtt_service.stop()
 
 
 app = FastAPI(title=settings.APP_NAME, version=settings.APP_VERSION, lifespan=lifespan)

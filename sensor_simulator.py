@@ -18,9 +18,12 @@ from __future__ import annotations
 import random
 import threading
 import time
+import json
+import os
 from datetime import datetime
 
 import requests
+import paho.mqtt.publish as mqtt_publish
 
 BASE_URL = "http://localhost:8000"
 LOGIN_URL = f"{BASE_URL}/api/v1/auth/login"
@@ -28,6 +31,11 @@ ROOMS_URL = f"{BASE_URL}/api/v1/rooms"
 INGEST_URL = f"{BASE_URL}/api/v1/sensors/ingest"
 DEVICES_URL = f"{BASE_URL}/api/v1/devices"
 RESET_HISTORY_URL = f"{BASE_URL}/api/v1/sensors/history/reset"
+MQTT_BROKER_HOST = os.getenv("MQTT_BROKER_HOST", "localhost")
+MQTT_BROKER_PORT = int(os.getenv("MQTT_BROKER_PORT", "1883"))
+MQTT_SENSOR_TOPIC = os.getenv("MQTT_SENSOR_TOPIC", "smartclassrooms/sensors/readings")
+TRANSPORT_MODE = os.getenv("SIMULATOR_TRANSPORT", "mqtt").lower()
+RESET_HISTORY_ON_START = os.getenv("SIMULATOR_RESET_HISTORY_ON_START", "false").lower() == "true"
 
 USERNAME = "admin@example.com"
 PASSWORD = "admin123"
@@ -220,6 +228,20 @@ def send_reading(
         "motion_detected": random.choice([True, False]),
         "recorded_at": datetime.now().isoformat(),
     }
+    if TRANSPORT_MODE == "mqtt":
+        mqtt_publish.single(
+            MQTT_SENSOR_TOPIC,
+            payload=json.dumps(payload),
+            hostname=MQTT_BROKER_HOST,
+            port=MQTT_BROKER_PORT,
+        )
+        print(
+            f"[{payload['recorded_at']}] room={room_id} temp={temp}C "
+            f"hum={humidity}% co2={co2}ppm -> MQTT {MQTT_SENSOR_TOPIC}",
+            flush=True,
+        )
+        return
+
     response = requests.post(
         INGEST_URL,
         json=payload,
@@ -288,7 +310,8 @@ def main() -> None:
     if not room_ids:
         raise RuntimeError("No rooms returned by backend")
 
-    reset_sensor_history(token, room_ids)
+    if RESET_HISTORY_ON_START:
+        reset_sensor_history(token, room_ids)
 
     environments = {
         room_id: create_initial_environment(room_id)

@@ -1,280 +1,194 @@
 # Smart Classroom Backend
 
-Backend FastAPI cho hệ thống giám sát và điều khiển phòng học thông minh.
+Backend FastAPI cho he thong giam sat va dieu khien phong hoc thong minh.
 
-## Tính năng chính
+## Chuc nang chinh
 
-- Đăng nhập JWT
-- Quản lý phòng học
-- Nhận dữ liệu cảm biến
-- Điều khiển thiết bị
-- Tự động hóa theo rule
-- Cảnh báo và dashboard
-- Thời khóa biểu theo `room + shift + day`
-- Chế độ `tự động / thủ công` theo từng phòng
-- Đổi mật khẩu cho tài khoản đang đăng nhập
+- Dang nhap JWT
+- Quan ly phong hoc
+- Nhan du lieu cam bien
+- Dieu khien thiet bi
+- Tu dong hoa theo rule
+- Alert va dashboard
+- Phan quyen theo `room + shift + day`
+- MQTT cho sensor data va device command
 
-## Yêu cầu
+## Yeu cau
 
 - Python 3.11+
-- `pip`
+- Pip
+- MQTT Broker neu muon chay luong MQTT that
 
-Kiểm tra nhanh:
-
-```bash
-python --version
-pip --version
-```
-
-## Cài đặt
-
-### 1. Vào thư mục backend
+## Cai dat
 
 ```powershell
 cd e:\baitapCNPM\backend
-```
-
-### 2. Tạo virtual environment
-
-Windows CMD:
-
-```cmd
-python -m venv .venv
-.venv\Scripts\activate.bat
-```
-
-Windows PowerShell:
-
-```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-```
-
-### 3. Cài dependencies
-
-```bash
 pip install -r requirements.txt
 ```
 
-### 4. Tạo file môi trường
+## Cau hinh
 
-Copy `.env.example` thành `.env`, hoặc dùng cấu hình tối thiểu:
+Copy `.env.example` thanh `.env`.
+
+Bien toi thieu:
 
 ```env
 SECRET_KEY=change-this-secret-key
 DATABASE_URL=sqlite+aiosqlite:///./smart_classroom.db
 ACCESS_TOKEN_EXPIRE_MINUTES=120
+MQTT_ENABLED=true
+MQTT_BROKER_HOST=localhost
+MQTT_BROKER_PORT=1883
+MQTT_SENSOR_TOPIC=smartclassrooms/sensors/readings
+MQTT_DEVICE_COMMAND_TOPIC_PREFIX=smartclassrooms/devices
+MQTT_DEVICE_ACK_TIMEOUT_SECONDS=3
+SIMULATOR_RESET_HISTORY_ON_START=false
 ```
 
-## Chạy backend
+## Chay backend
 
 ```powershell
 cd e:\baitapCNPM\backend
 .\.venv\Scripts\Activate.ps1
-uvicorn main:app --reload
+$env:MQTT_BROKER_HOST="localhost"
+python -m uvicorn main:app --host 127.0.0.1 --port 8000
 ```
 
-Địa chỉ mặc định:
+Dia chi mac dinh:
 
 - API docs: `http://127.0.0.1:8000/docs`
 - Health: `http://127.0.0.1:8000/health`
 - WebSocket alerts: `ws://127.0.0.1:8000/ws/alerts`
 
-## Tài khoản mặc định
+## Tai khoan mac dinh
 
-Admin được seed tự động:
+- Admin:
+  - Email: `admin@example.com`
+  - Password: `admin123`
+- Demo user 1:
+  - Email: `demo.user1@example.com`
+  - Password: `user12345`
+- Demo user 2:
+  - Email: `demo.user2@example.com`
+  - Password: `user12345`
 
-- Email: `admin@example.com`
-- Password: `admin123`
+## MQTT flow
 
-Hai user demo cũng được seed tự động:
+He thong hien ho tro 2 huong:
 
-- Email: `demo.user1@example.com`
-- Password: `user12345`
-- Email: `demo.user2@example.com`
-- Password: `user12345`
+- Sensor data:
+  `sensor_simulator.py -> MQTT Broker -> backend -> database -> websocket/api -> frontend`
+- Device command:
+  `frontend -> backend -> MQTT Broker -> device_command_simulator.py`
 
-Đăng nhập:
+## Sensor simulator
 
-```http
-POST /api/v1/auth/login
-Content-Type: application/x-www-form-urlencoded
-```
+File: `sensor_simulator.py`
 
-Trong Swagger:
+Chuc nang:
 
-- `username` = email
-- `password` = mật khẩu
+- Dang nhap backend bang admin
+- Lay danh sach phong
+- Lay trang thai thiet bi tung phong
+- Gia lap nhiet do, do am, CO2
+- Publish du lieu len MQTT hoac goi HTTP ingest
 
-## Quyền truy cập theo lịch
-
-User thường chỉ được xem hoặc điều khiển phòng khi trong thời khóa biểu hiện tại có đúng:
-
-- `room_id`
-- `shift_number`
-- `day_of_week`
-
-Điều này áp dụng cho các luồng đọc dữ liệu phòng, thiết bị, dashboard và cảnh báo theo phòng hiện tại.
-
-Admin được bỏ qua kiểm tra này.
-
-Khung giờ 6 ca:
-
-- Ca 1: `07:00 - 09:35`
-- Ca 2: `09:35 - 12:00`
-- Ca 3: `13:00 - 15:35`
-- Ca 4: `15:35 - 18:00`
-- Ca 5: `18:15 - 19:50`
-- Ca 6: `19:55 - 21:30`
-
-`day_of_week` dùng chuẩn Python: `0=Monday ... 6=Sunday`
-
-## API thời khóa biểu
-
-```http
-POST /api/v1/auth/users/{user_id}/schedule
-Content-Type: application/json
-
-{
-  "room_id": 1,
-  "shifts": [2, 3],
-  "days_of_week": [0, 2, 4]
-}
-```
-
-```http
-GET /api/v1/auth/users/{user_id}/schedule
-```
-
-```http
-GET /api/v1/auth/me/schedule
-```
-
-```http
-GET /api/v1/auth/rooms/{room_id}/schedule
-```
-
-```http
-DELETE /api/v1/auth/users/{user_id}/schedule?room_id=1&shift_number=2&day_of_week=0
-```
-
-Tương thích ngược:
-
-- Hệ thống vẫn giữ các endpoint `room-access` cũ để không làm vỡ code đang chạy.
-- Về mặt nghiệp vụ, mỗi bản ghi `room-access` được hiểu là một ô trong thời khóa biểu của user.
-
-## Thiết bị và tự động hóa
-
-Mỗi phòng hiện được seed:
-
-- 4 quạt
-- 4 đèn
-- 3 điều hòa
-
-Chế độ hoạt động của phòng:
-
-- `auto_control_enabled = true`: cho phép automation rules chạy khi ingest sensor
-- `auto_control_enabled = false`: phòng ở chế độ thủ công, backend sẽ bỏ qua automation
-
-API cập nhật mode:
-
-```http
-PUT /api/v1/rooms/{room_id}/automation-mode
-Content-Type: application/json
-
-{
-  "auto_control_enabled": false
-}
-```
-
-Lưu ý:
-
-- Khi chuyển phòng sang `manual`, toàn bộ rules của phòng sẽ bị tắt theo.
-- Khi rules của phòng được bật lại, mode của phòng cũng được đồng bộ lại theo backend.
-
-## Tương thích SQLite cũ
-
-Backend hiện có bước migrate schema SQLite cũ cho một số thay đổi legacy đã biết, ví dụ:
-
-- `rooms.building`
-- `rooms.auto_control_enabled`
-- `devices.target_temp`
-- `users.full_name`
-- `users.created_at`
-
-Mục tiêu là để máy khác pull code mới về vẫn chạy được với file SQLite cũ mà không phải xóa DB ngay từ đầu.
-
-Lưu ý:
-
-- Đây chưa phải hệ thống migration đầy đủ kiểu Alembic.
-- Nếu sau này schema đổi lớn hơn, nên bổ sung migration bài bản.
-
-## Đổi mật khẩu
-
-Tài khoản đang đăng nhập có thể đổi mật khẩu bằng API:
-
-```http
-PUT /api/v1/auth/me/password
-Content-Type: application/json
-
-{
-  "current_password": "admin123",
-  "new_password": "admin12345"
-}
-```
-
-## Sensor Simulator
-
-File `sensor_simulator.py`:
-
-- Đăng nhập bằng admin mặc định
-- Lấy toàn bộ danh sách phòng từ backend
-- Chạy giả lập song song cho từng phòng
-- Phản ứng theo trạng thái thiết bị từng phòng
-- Tự reset lịch sử sensor cũ trước khi bơm dữ liệu mới
-
-Chạy:
+Chay voi MQTT:
 
 ```powershell
 cd e:\baitapCNPM\backend
 .\.venv\Scripts\Activate.ps1
+$env:SIMULATOR_TRANSPORT="mqtt"
+$env:MQTT_BROKER_HOST="localhost"
 python sensor_simulator.py
 ```
 
-Nếu backend đang chạy, simulator sẽ bơm dữ liệu liên tục vào:
+Neu muon reset lich su sensor truoc khi chay:
 
-```http
-POST /api/v1/sensors/ingest
+```powershell
+$env:SIMULATOR_RESET_HISTORY_ON_START="true"
 ```
 
-## Chạy test
+## Device command simulator
 
-Chạy toàn bộ:
+File: `device_command_simulator.py`
 
-```bash
+Chuc nang:
+
+- Subscribe topic device command
+- Gia lap ESP32 nhan lenh `ON / OFF / OPEN / CLOSE / SET_TEMPERATURE`
+- Publish ACK nhe len topic status
+
+Chay:
+
+```powershell
+cd e:\baitapCNPM\backend
+.\.venv\Scripts\Activate.ps1
+$env:MQTT_BROKER_HOST="localhost"
+python device_command_simulator.py
+```
+
+Topic command mac dinh:
+
+```text
+smartclassrooms/devices/{room_id}/{device_id}/commands
+```
+
+## API chinh
+
+- Auth:
+  - `POST /api/v1/auth/login`
+- Rooms:
+  - `GET /api/v1/rooms`
+  - `PUT /api/v1/rooms/{room_id}/automation-mode`
+- Sensors:
+  - `POST /api/v1/sensors/ingest`
+  - `GET /api/v1/sensors/{room_id}/latest`
+  - `GET /api/v1/sensors/{room_id}/history`
+- Devices:
+  - `GET /api/v1/devices/{room_id}`
+  - `POST /api/v1/devices/{device_id}/control`
+  - `PUT /api/v1/devices/{device_id}/temperature`
+- Alerts:
+  - `GET /api/v1/alerts/`
+  - `POST /api/v1/alerts/{alert_id}/resolve`
+
+## Test
+
+Chay toan bo:
+
+```powershell
+cd e:\baitapCNPM\backend
+.\.venv\Scripts\Activate.ps1
 pytest -q
 ```
 
-Ví dụ:
+Tinh den luc README nay duoc cap nhat, backend pass:
 
-```bash
-pytest -q tests/test_api_auth.py
-pytest -q tests/test_api_alerts.py
-pytest -q tests/test_api_rooms.py
-pytest -q tests/test_db_migrations.py
-```
+- `102` tests
 
 ## Docker
 
-Container hiện chạy:
+Neu Docker Desktop dang chay:
 
-```bash
-python -m uvicorn main:app --host 0.0.0.0 --port 8000
+```powershell
+cd e:\baitapCNPM
+docker compose up --build
 ```
 
-Không dùng `--reload` trong `Dockerfile`.
+Compose se dung:
 
-## Cấu trúc chính
+- MQTT Broker
+- Backend
+- Frontend
+
+## Tai lieu bo sung
+
+- `ARCHITECTURE.md`: tom tat kien truc va luong du lieu
+
+## Cau truc chinh
 
 ```text
 app/

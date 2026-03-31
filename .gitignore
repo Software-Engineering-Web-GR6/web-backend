@@ -18,6 +18,7 @@ __pycache__/
 htmlcov/
 simulator.stdout.log
 simulator.stderr.log
+*.log
 
 # OS/editor
 .DS_Store
