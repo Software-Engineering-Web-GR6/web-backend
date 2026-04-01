@@ -15,7 +15,7 @@ TestSessionLocal = async_sessionmaker(bind=test_engine, class_=AsyncSession, exp
 
 @pytest_asyncio.fixture(autouse=True)
 async def setup_db():
-    from app.models import action_log, alert, automation_rule, device, room, sensor_reading, user, user_room_shift_access  # noqa
+    from app.models import action_log, alert, automation_rule, device, room, sensor_reading, user, user_room_shift_access, password_reset_code  # noqa
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield

@@ -44,6 +44,16 @@ MQTT_BROKER_PORT=1883
 MQTT_SENSOR_TOPIC=smartclassrooms/sensors/readings
 MQTT_DEVICE_COMMAND_TOPIC_PREFIX=smartclassrooms/devices
 MQTT_DEVICE_ACK_TIMEOUT_SECONDS=1.5
+SMTP_ENABLED=false
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=
+SMTP_PASSWORD=
+SMTP_FROM_EMAIL=noreply@smartclassroom.local
+SMTP_USE_TLS=true
+PASSWORD_RESET_CODE_EXPIRE_MINUTES=10
+PASSWORD_RESET_CODE_LENGTH=6
+PASSWORD_RESET_MAX_ATTEMPTS=5
 SIMULATOR_RESET_HISTORY_ON_START=false
 ```
 
@@ -140,6 +150,9 @@ smartclassrooms/devices/{room_id}/{device_id}/commands
 
 - Auth:
   - `POST /api/v1/auth/login`
+  - `POST /api/v1/auth/forgot-password`
+  - `POST /api/v1/auth/verify-reset-code`
+  - `POST /api/v1/auth/reset-password`
 - Rooms:
   - `GET /api/v1/rooms`
   - `PUT /api/v1/rooms/{room_id}/automation-mode`

@@ -98,7 +98,7 @@ async def _migrate_legacy_schema(conn) -> None:
 
 
 async def init_db():
-    from app.models import room, device, sensor_reading, automation_rule, action_log, alert, user, user_room_shift_access  # noqa
+    from app.models import room, device, sensor_reading, automation_rule, action_log, alert, user, user_room_shift_access, password_reset_code  # noqa
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         await _migrate_legacy_schema(conn)
