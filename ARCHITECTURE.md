@@ -8,7 +8,7 @@ Tai lieu nay tom tat kien truc hien tai cua du an de dua vao bao cao va de mo ta
 
 - `Frontend`: giao dien React/Vite cho admin va user.
 - `Backend`: FastAPI xu ly auth, room, device, sensor, alert, dashboard.
-- `Database`: SQLite cho moi truong local/demo.
+- `Database`: PostgreSQL la database chinh cho local/dev/deploy.
 - `MQTT Broker`: lop trung gian cho sensor data va device command.
 - `sensor_simulator.py`: gia lap node IoT gui du lieu cam bien.
 - `device_command_simulator.py`: gia lap node IoT nhan lenh dieu khien thiet bi.
@@ -54,6 +54,7 @@ Tai lieu nay tom tat kien truc hien tai cua du an de dua vao bao cao va de mo ta
   - sensor -> MQTT -> backend
   - backend -> MQTT -> device command consumer
 - Frontend hien tai van giao tiep voi backend bang REST va WebSocket.
+- PostgreSQL la duong chay chinh; nhanh xu ly SQLite chi con de tuong thich du lieu cu.
 - MQTT status acknowledgement da co o muc simulator, nhung backend chua consume topic status nay de cap nhat `is_online` hay command ack.
 
 ## Huong mo rong sau nay

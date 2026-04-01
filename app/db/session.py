@@ -1,6 +1,6 @@
 from collections.abc import Awaitable, Callable
 import logging
-from datetime import datetime
+from typing import cast
 
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, ProgrammingError
@@ -15,12 +15,30 @@ class Base(DeclarativeBase):
     pass
 
 
-engine = create_async_engine(settings.DATABASE_URL, echo=False, future=True)
-AsyncSessionLocal = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+engine = None
+AsyncSessionLocal = None
+
+
+def _build_engine_and_sessionmaker() -> tuple:
+    db_engine = create_async_engine(settings.DATABASE_URL, echo=False, future=True)
+    session_factory = async_sessionmaker(
+        bind=db_engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+    return db_engine, session_factory
+
+
+def ensure_engine_initialized():
+    global engine, AsyncSessionLocal
+    if engine is None or AsyncSessionLocal is None:
+        engine, AsyncSessionLocal = _build_engine_and_sessionmaker()
+    return engine, AsyncSessionLocal
 
 
 async def get_db():
-    async with AsyncSessionLocal() as session:
+    _, session_factory = ensure_engine_initialized()
+    async with cast(async_sessionmaker[AsyncSession], session_factory)() as session:
         yield session
 
 
@@ -97,11 +115,18 @@ async def _migrate_legacy_schema(conn) -> None:
         )
 
 
+async def _migrate_legacy_schema_if_needed(conn) -> None:
+    if conn.dialect.name != "sqlite":
+        return
+    await _migrate_legacy_schema(conn)
+
+
 async def init_db():
     from app.models import room, device, sensor_reading, automation_rule, action_log, alert, user, user_room_shift_access  # noqa
-    async with engine.begin() as conn:
+    db_engine, _ = ensure_engine_initialized()
+    async with db_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        await _migrate_legacy_schema(conn)
+        await _migrate_legacy_schema_if_needed(conn)
 
 
 async def bootstrap_database(seed_callback: Callable[[AsyncSession], Awaitable[None]]) -> None:
@@ -109,12 +134,13 @@ async def bootstrap_database(seed_callback: Callable[[AsyncSession], Awaitable[N
         logger.info("Initializing database schema")
         await init_db()
         logger.info("Database schema ready; starting seed phase")
-        async with AsyncSessionLocal() as session:
+        _, session_factory = ensure_engine_initialized()
+        async with cast(async_sessionmaker[AsyncSession], session_factory)() as session:
             await seed_callback(session)
         logger.info("Database seed completed")
     except (OperationalError, ProgrammingError) as exc:
         logger.exception("Database bootstrap failed with a schema or query error")
         raise RuntimeError(
-            "Database schema is incompatible and could not be migrated automatically. "
-            "Review the existing SQLite file and add an explicit migration for the missing fields."
+            "Database schema is incompatible and could not be initialized automatically. "
+            "Review the active database and add an explicit migration for the missing fields."
         ) from exc

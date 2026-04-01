@@ -36,7 +36,8 @@ Bien toi thieu:
 
 ```env
 SECRET_KEY=change-this-secret-key
-DATABASE_URL=sqlite+aiosqlite:///./smart_classroom.db
+DATABASE_URL=postgresql+asyncpg://smartclassroom:smartclassroom@localhost:5432/smart_classroom
+TEST_DATABASE_URL=sqlite+aiosqlite:///:memory:
 ACCESS_TOKEN_EXPIRE_MINUTES=120
 MQTT_ENABLED=true
 MQTT_BROKER_HOST=localhost
@@ -55,6 +56,10 @@ cd e:\baitapCNPM\backend
 $env:MQTT_BROKER_HOST="localhost"
 python -m uvicorn main:app --host 127.0.0.1 --port 8000
 ```
+
+Neu chay local khong dung Docker, ban can co PostgreSQL dang chay tai `localhost:5432`
+va database `smart_classroom`/user `smartclassroom` theo `DATABASE_URL`, hoac tu sua lai
+chuoi ket noi trong `.env`.
 
 Dia chi mac dinh:
 
@@ -180,9 +185,16 @@ docker compose up --build
 
 Compose se dung:
 
+- PostgreSQL
 - MQTT Broker
 - Backend
 - Frontend
+
+## Ghi chu migration
+
+- PostgreSQL la database mac dinh cua ung dung.
+- Nhanh migration SQLite trong code chi con de doc/nang cap file SQLite cu neu can.
+- Test suite mac dinh van dung `TEST_DATABASE_URL=sqlite+aiosqlite:///:memory:` de giu toc do.
 
 ## Tai lieu bo sung
 

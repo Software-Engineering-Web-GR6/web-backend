@@ -7,7 +7,7 @@ import paho.mqtt.client as mqtt
 from pydantic import ValidationError
 
 from app.core.config import settings
-from app.db.session import AsyncSessionLocal
+from app.db.session import ensure_engine_initialized
 from app.schemas.sensor import SensorReadingCreate
 from app.services.sensor_service import sensor_service
 
@@ -191,7 +191,8 @@ class MQTTService:
             logger.warning("Ignoring invalid MQTT payload: %s", payload_text)
             return
 
-        async with AsyncSessionLocal() as session:
+        _, session_factory = ensure_engine_initialized()
+        async with session_factory() as session:
             reading, executed = await sensor_service.ingest(session, payload)
             logger.info(
                 "Ingested MQTT sensor reading | room_id=%s reading_id=%s executed_rules=%s",
