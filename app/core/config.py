@@ -2,6 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    ENVIRONMENT: str = "development"
     APP_NAME: str = "Smart Classroom Backend"
     APP_VERSION: str = "1.0.0"
     SECRET_KEY: str = "change-this-secret-key"
@@ -20,6 +21,16 @@ class Settings(BaseSettings):
     MQTT_CLIENT_ID: str = "smart-classroom-backend"
     MQTT_KEEPALIVE_SECONDS: int = 60
     MQTT_DEVICE_ACK_TIMEOUT_SECONDS: float = 1.5
+    SMTP_ENABLED: bool = False
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = "noreply@smartclassroom.local"
+    SMTP_USE_TLS: bool = True
+    PASSWORD_RESET_CODE_EXPIRE_MINUTES: int = 10
+    PASSWORD_RESET_CODE_LENGTH: int = 6
+    PASSWORD_RESET_MAX_ATTEMPTS: int = 5
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
