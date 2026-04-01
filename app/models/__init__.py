@@ -6,4 +6,3 @@ from app.models.automation_rule import AutomationRule
 from app.models.action_log import ActionLog
 from app.models.alert import Alert
 from app.models.user_room_shift_access import UserRoomShiftAccess
-from app.models.password_reset_code import PasswordResetCode
