@@ -176,14 +176,45 @@ Tinh den luc README nay duoc cap nhat, backend pass:
 
 ## Docker
 
+### Chay rieng trong repo backend
+
+Repo backend nay da co file Docker rieng tai `docker-compose.yml`.
+
 Neu Docker Desktop dang chay:
+
+```powershell
+cd e:\baitapCNPM\backend
+docker compose up --build
+```
+
+Compose trong repo backend se dung:
+
+- PostgreSQL
+- Backend
+
+Mac dinh:
+
+- Backend: `http://127.0.0.1:8000`
+- Docs: `http://127.0.0.1:8000/docs`
+- MQTT da tat (`MQTT_ENABLED=false`) de demo/deploy backend don gian hon
+
+Neu chi muon bat PostgreSQL:
+
+```powershell
+cd e:\baitapCNPM\backend
+docker compose up -d postgres
+```
+
+### Chay full stack o workspace goc
+
+Neu ban dang dung full workspace co ca frontend + mqtt broker:
 
 ```powershell
 cd e:\baitapCNPM
 docker compose up --build
 ```
 
-Compose se dung:
+Compose o workspace goc se dung:
 
 - PostgreSQL
 - MQTT Broker
