@@ -303,3 +303,104 @@ class TestAuthAPI:
             headers={"Authorization": f"Bearer {user_token}"},
         )
         assert resp.status_code == 403
+
+    async def test_forgot_password_returns_generic_message_for_unknown_email(self, client):
+        resp = await client.post(
+            "/api/v1/auth/forgot-password",
+            json={"email": "unknown@example.com"},
+        )
+        assert resp.status_code == 200
+        assert "If the account exists" in resp.json()["message"]
+
+    async def test_forgot_password_and_reset_password_success(self, client, monkeypatch):
+        from app.services.auth_service import auth_service
+        from app.services.mail_service import mail_service
+
+        sent_payload = {}
+
+        async def fake_send_password_reset_code(to_email: str, code: str, expires_minutes: int):
+            sent_payload["email"] = to_email
+            sent_payload["code"] = code
+            sent_payload["expires_minutes"] = expires_minutes
+
+        monkeypatch.setattr(auth_service, "_generate_reset_code", lambda: "123456")
+        monkeypatch.setattr(mail_service, "send_password_reset_code", fake_send_password_reset_code)
+
+        forgot_resp = await client.post(
+            "/api/v1/auth/forgot-password",
+            json={"email": "admin@example.com"},
+        )
+        assert forgot_resp.status_code == 200
+        assert sent_payload["email"] == "admin@example.com"
+        assert sent_payload["code"] == "123456"
+
+        verify_resp = await client.post(
+            "/api/v1/auth/verify-reset-code",
+            json={"email": "admin@example.com", "code": "123456"},
+        )
+        assert verify_resp.status_code == 200
+
+        reset_resp = await client.post(
+            "/api/v1/auth/reset-password",
+            json={"email": "admin@example.com", "code": "123456", "new_password": "admin12345"},
+        )
+        assert reset_resp.status_code == 200
+        assert reset_resp.json()["message"] == "Password updated successfully"
+
+        login_resp = await client.post(
+            "/api/v1/auth/login",
+            data={"username": "admin@example.com", "password": "admin12345"},
+        )
+        assert login_resp.status_code == 200
+
+    async def test_verify_reset_code_rejects_invalid_code(self, client, monkeypatch):
+        from app.services.auth_service import auth_service
+        from app.services.mail_service import mail_service
+
+        async def fake_send_password_reset_code(to_email: str, code: str, expires_minutes: int):
+            return None
+
+        monkeypatch.setattr(auth_service, "_generate_reset_code", lambda: "123456")
+        monkeypatch.setattr(mail_service, "send_password_reset_code", fake_send_password_reset_code)
+
+        forgot_resp = await client.post(
+            "/api/v1/auth/forgot-password",
+            json={"email": "admin@example.com"},
+        )
+        assert forgot_resp.status_code == 200
+
+        verify_resp = await client.post(
+            "/api/v1/auth/verify-reset-code",
+            json={"email": "admin@example.com", "code": "000000"},
+        )
+        assert verify_resp.status_code == 400
+        assert verify_resp.json()["detail"] == "Invalid or expired verification code"
+
+    async def test_reset_password_rejects_used_code(self, client, monkeypatch):
+        from app.services.auth_service import auth_service
+        from app.services.mail_service import mail_service
+
+        async def fake_send_password_reset_code(to_email: str, code: str, expires_minutes: int):
+            return None
+
+        monkeypatch.setattr(auth_service, "_generate_reset_code", lambda: "654321")
+        monkeypatch.setattr(mail_service, "send_password_reset_code", fake_send_password_reset_code)
+
+        forgot_resp = await client.post(
+            "/api/v1/auth/forgot-password",
+            json={"email": "admin@example.com"},
+        )
+        assert forgot_resp.status_code == 200
+
+        first_reset = await client.post(
+            "/api/v1/auth/reset-password",
+            json={"email": "admin@example.com", "code": "654321", "new_password": "admin12345"},
+        )
+        assert first_reset.status_code == 200
+
+        second_reset = await client.post(
+            "/api/v1/auth/reset-password",
+            json={"email": "admin@example.com", "code": "654321", "new_password": "admin67890"},
+        )
+        assert second_reset.status_code == 400
+        assert second_reset.json()["detail"] == "Invalid or expired verification code"

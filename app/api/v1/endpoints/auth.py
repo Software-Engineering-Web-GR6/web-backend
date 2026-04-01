@@ -5,6 +5,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import get_current_user, get_db_session, require_admin
 from app.schemas.auth import (
     ChangePasswordRequest,
+    ForgotPasswordRequest,
+    MessageResponse,
+    ResetPasswordRequest,
     TokenResponse,
     UserCreateRequest,
     UserResponse,
@@ -12,8 +15,10 @@ from app.schemas.auth import (
     UserRoomAccessResponse,
     UserScheduleAssignRequest,
     UserScheduleEntryResponse,
+    VerifyResetCodeRequest,
 )
 from app.services.auth_service import auth_service
+from app.services.mail_service import MailDeliveryError
 
 router = APIRouter()   # KHÔNG để prefix="/auth"
 
@@ -34,6 +39,60 @@ async def login(
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(exc),
+        )
+
+
+@router.post("/forgot-password", response_model=MessageResponse)
+async def forgot_password(
+    payload: ForgotPasswordRequest,
+    db: AsyncSession = Depends(get_db_session),
+):
+    try:
+        await auth_service.request_password_reset(db, str(payload.email))
+    except (ValueError, MailDeliveryError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        )
+    return {"message": "If the account exists, a verification code has been sent to the registered email."}
+
+
+@router.post("/verify-reset-code", response_model=MessageResponse)
+async def verify_reset_code(
+    payload: VerifyResetCodeRequest,
+    db: AsyncSession = Depends(get_db_session),
+):
+    try:
+        await auth_service.verify_password_reset_code(
+            db,
+            str(payload.email),
+            payload.code,
+        )
+        return {"message": "Verification code is valid"}
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        )
+
+
+@router.post("/reset-password", response_model=MessageResponse)
+async def reset_password(
+    payload: ResetPasswordRequest,
+    db: AsyncSession = Depends(get_db_session),
+):
+    try:
+        await auth_service.reset_password_with_code(
+            db,
+            str(payload.email),
+            payload.code,
+            payload.new_password,
+        )
+        return {"message": "Password updated successfully"}
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         )
 
