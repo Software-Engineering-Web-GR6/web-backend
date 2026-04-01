@@ -12,6 +12,8 @@ from app.db.seed import seed_data
 
 @pytest.mark.asyncio
 async def test_bootstrap_database_migrates_legacy_users_table_without_data_loss(monkeypatch):
+    # Keep one SQLite-focused test so the compatibility path for old local DB files
+    # does not regress while PostgreSQL remains the primary database backend.
     temp_dir = Path("tests") / ".tmp_migrations" / uuid4().hex
     temp_dir.mkdir(parents=True, exist_ok=True)
     database_path = temp_dir / "legacy.db"

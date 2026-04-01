@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "change-this-secret-key"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 120
-    DATABASE_URL: str = "sqlite+aiosqlite:///./smart_classroom.db"
+    DATABASE_URL: str = "postgresql+asyncpg://smartclassroom:smartclassroom@localhost:5432/smart_classroom"
     DEFAULT_TEMP_WARNING: float = 30
     DEFAULT_TEMP_DANGER: float = 35
     DEFAULT_HUMIDITY_WARNING: float = 80
