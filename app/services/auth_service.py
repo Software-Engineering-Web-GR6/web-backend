@@ -1,31 +1,11 @@
-from datetime import datetime, timedelta, timezone
-import hashlib
-import secrets
-
-from sqlalchemy import delete, func, select
+from sqlalchemy import select
 from app.models.user import User
 from app.models.room import Room
 from app.models.user_room_shift_access import UserRoomShiftAccess
-from app.models.password_reset_code import PasswordResetCode
-from app.core.config import settings
 from app.core.security import verify_password, create_access_token, hash_password
-from app.services.mail_service import mail_service
 
 
 class AuthService:
-    def _normalized_email(self, email: str) -> str:
-        return email.strip().lower()
-
-    def _hash_reset_code(self, email: str, code: str) -> str:
-        payload = f"{self._normalized_email(email)}:{code}:{settings.SECRET_KEY}"
-        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
-
-    def _generate_reset_code(self) -> str:
-        digits = max(4, settings.PASSWORD_RESET_CODE_LENGTH)
-        lower_bound = 10 ** (digits - 1)
-        upper_bound = (10 ** digits) - 1
-        return str(secrets.randbelow(upper_bound - lower_bound + 1) + lower_bound)
-
     async def get_user_by_id(self, db, user_id: int):
         result = await db.execute(select(User).where(User.id == user_id))
         return result.scalar_one_or_none()
@@ -80,104 +60,6 @@ class AuthService:
             raise ValueError("New password must be different from current password")
 
         user.password_hash = hash_password(new_password)
-        await db.commit()
-        await db.refresh(user)
-        return user
-
-    async def request_password_reset(self, db, email: str):
-        normalized_email = self._normalized_email(email)
-        result = await db.execute(select(User).where(func.lower(User.email) == normalized_email))
-        user = result.scalar_one_or_none()
-        if not user:
-            return
-
-        await db.execute(
-            delete(PasswordResetCode).where(
-                PasswordResetCode.user_id == user.id,
-                PasswordResetCode.used_at.is_(None),
-            )
-        )
-
-        code = self._generate_reset_code()
-        expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.PASSWORD_RESET_CODE_EXPIRE_MINUTES)
-
-        db.add(
-            PasswordResetCode(
-                user_id=user.id,
-                email=normalized_email,
-                code_hash=self._hash_reset_code(normalized_email, code),
-                attempts=0,
-                expires_at=expires_at,
-            )
-        )
-
-        try:
-            await mail_service.send_password_reset_code(
-                to_email=normalized_email,
-                code=code,
-                expires_minutes=settings.PASSWORD_RESET_CODE_EXPIRE_MINUTES,
-            )
-            await db.commit()
-        except Exception:
-            await db.rollback()
-            raise
-
-    async def _get_active_reset_code(self, db, email: str) -> PasswordResetCode | None:
-        normalized_email = self._normalized_email(email)
-        now = datetime.now(timezone.utc)
-        result = await db.execute(
-            select(PasswordResetCode)
-            .where(
-                PasswordResetCode.email == normalized_email,
-                PasswordResetCode.used_at.is_(None),
-                PasswordResetCode.expires_at > now,
-                PasswordResetCode.attempts < settings.PASSWORD_RESET_MAX_ATTEMPTS,
-            )
-            .order_by(PasswordResetCode.created_at.desc())
-            .limit(1)
-        )
-        return result.scalar_one_or_none()
-
-    async def verify_password_reset_code(self, db, email: str, code: str):
-        reset_entry = await self._get_active_reset_code(db, email)
-        if not reset_entry:
-            raise ValueError("Invalid or expired verification code")
-
-        expected_hash = self._hash_reset_code(email, code)
-        if reset_entry.code_hash != expected_hash:
-            reset_entry.attempts += 1
-            await db.commit()
-            raise ValueError("Invalid or expired verification code")
-
-    async def reset_password_with_code(self, db, email: str, code: str, new_password: str):
-        normalized_email = self._normalized_email(email)
-        user_result = await db.execute(select(User).where(func.lower(User.email) == normalized_email))
-        user = user_result.scalar_one_or_none()
-        if not user:
-            raise ValueError("Invalid or expired verification code")
-
-        reset_entry = await self._get_active_reset_code(db, normalized_email)
-        if not reset_entry:
-            raise ValueError("Invalid or expired verification code")
-
-        expected_hash = self._hash_reset_code(normalized_email, code)
-        if reset_entry.code_hash != expected_hash:
-            reset_entry.attempts += 1
-            await db.commit()
-            raise ValueError("Invalid or expired verification code")
-
-        if verify_password(new_password, user.password_hash):
-            raise ValueError("New password must be different from current password")
-
-        user.password_hash = hash_password(new_password)
-        reset_entry.used_at = datetime.now(timezone.utc)
-
-        await db.execute(
-            delete(PasswordResetCode).where(
-                PasswordResetCode.user_id == user.id,
-                PasswordResetCode.id != reset_entry.id,
-            )
-        )
         await db.commit()
         await db.refresh(user)
         return user
