@@ -1,2 +1,24 @@
 venv/
 __pycache__/
+.env
+*.db
+*.sqlite
+*.sqlite3
+
+# Python caches
+*.py[cod]
+*$py.class
+
+# Tool caches / test outputs
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+simulator.stdout.log
+simulator.stderr.log
+*.log
+
+# OS/editor
+.DS_Store
