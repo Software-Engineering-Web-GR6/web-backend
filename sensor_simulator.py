@@ -25,7 +25,7 @@ from datetime import datetime
 import requests
 import paho.mqtt.publish as mqtt_publish
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = os.getenv("BACKEND_BASE_URL", "http://localhost:8000")
 LOGIN_URL = f"{BASE_URL}/api/v1/auth/login"
 ROOMS_URL = f"{BASE_URL}/api/v1/rooms"
 INGEST_URL = f"{BASE_URL}/api/v1/sensors/ingest"

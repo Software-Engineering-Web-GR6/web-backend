@@ -117,6 +117,7 @@ cd e:\baitapCNPM\backend
 .\.venv\Scripts\Activate.ps1
 $env:SIMULATOR_TRANSPORT="mqtt"
 $env:MQTT_BROKER_HOST="localhost"
+$env:BACKEND_BASE_URL="http://localhost:8000"
 python sensor_simulator.py
 ```
 
@@ -232,7 +233,9 @@ Compose o workspace goc se dung:
 - PostgreSQL
 - MQTT Broker
 - Backend
-- Frontend
+- Frontend `frontend-demo2/smart-classrooms`
+- Device command simulator
+- Sensor simulator
 
 ## Ghi chu migration
 
