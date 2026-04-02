@@ -105,3 +105,17 @@ class TestRoomsAPI:
         rules_resp = await client.get("/api/v1/rules/room/1", headers=auth_headers)
         assert rules_resp.status_code == 200
         assert all(rule["is_active"] is False for rule in rules_resp.json())
+
+    async def test_seeded_co2_rule_targets_fan(self, client, auth_headers):
+        rules_resp = await client.get("/api/v1/rules/room/1", headers=auth_headers)
+        assert rules_resp.status_code == 200
+
+        devices_resp = await client.get("/api/v1/devices/1", headers=auth_headers)
+        assert devices_resp.status_code == 200
+        devices_by_id = {device["id"]: device for device in devices_resp.json()}
+
+        co2_rule = next(rule for rule in rules_resp.json() if rule["metric"] == "co2")
+        target_device = devices_by_id[co2_rule["target_device_id"]]
+
+        assert target_device["device_type"] == "fan"
+        assert co2_rule["action"] == "ON"
