@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from pydantic import Field
 
 
 class RoomResponse(BaseModel):
@@ -13,3 +14,9 @@ class RoomResponse(BaseModel):
 
 class RoomAutomationModeUpdate(BaseModel):
     auto_control_enabled: bool
+
+
+class RoomCreateRequest(BaseModel):
+    name: str = Field(min_length=3, max_length=100)
+    building: str = Field(min_length=1, max_length=10)
+    location: str | None = Field(default=None, max_length=100)

@@ -1,4 +1,6 @@
 from datetime import datetime
+from typing import Any
+
 from pydantic import BaseModel, EmailStr, Field
 
 
@@ -70,3 +72,26 @@ class UserScheduleAssignRequest(UserRoomAccessGrantRequest):
 
 class UserScheduleEntryResponse(UserRoomAccessResponse):
     pass
+
+
+class UserBatchImportRequest(BaseModel):
+    items: list[dict[str, Any]] = Field(min_length=1)
+
+
+class ScheduleBatchImportRequest(BaseModel):
+    items: list[dict[str, Any]] = Field(min_length=1)
+
+
+class BatchImportResultItem(BaseModel):
+    row_number: int
+    success: bool
+    message: str
+    email: str | None = None
+    room_name: str | None = None
+    user_id: int | None = None
+
+
+class BatchImportResponse(BaseModel):
+    created_count: int
+    failed_count: int
+    results: list[BatchImportResultItem]
