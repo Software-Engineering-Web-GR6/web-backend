@@ -49,6 +49,8 @@ HUM_MIN = 35.0
 HUM_MAX = 85.0
 CO2_MIN = 420.0
 CO2_MAX = 1600.0
+CO2_BASE_RISE_MIN = 2.0
+CO2_BASE_RISE_MAX = 8.0
 
 OUTDOOR_TEMP = 30.0
 OUTDOOR_HUM = 63.0
@@ -182,7 +184,9 @@ def evolve_environment(
     base_hum_target = INDOOR_HUM_BASELINE if not window_open else OUTDOOR_HUM
     temp_delta = (base_temp_target - temp) * 0.16 + random.uniform(-0.12, 0.12)
     hum_delta = (base_hum_target - humidity) * 0.12 + random.uniform(-0.18, 0.18)
-    co2_delta = random.uniform(8, 28)
+    # Let indoor CO2 drift upward slowly by default so alerts are not triggered
+    # almost immediately when no ventilation device is active.
+    co2_delta = random.uniform(CO2_BASE_RISE_MIN, CO2_BASE_RISE_MAX)
 
     if ac_on:
         temp_delta = (ac_target_temp - temp) * 0.42 + random.uniform(-0.08, 0.08)

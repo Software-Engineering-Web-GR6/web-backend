@@ -180,38 +180,64 @@ async def seed_data(db):
         await db.commit()
         device_result = await db.execute(select(Device).where(Device.room_id == room.id))
         devices = list(device_result.scalars().all())
+        devices_by_id = {device.id: device for device in devices}
 
+        first_fan = next((d for d in devices if d.device_type == "fan"), None)
         rule_result = await db.execute(select(AutomationRule).where(AutomationRule.room_id == room.id))
         rules = list(rule_result.scalars().all())
         if rules:
+            co2_rule = next(
+                (
+                    rule for rule in rules
+                    if rule.metric == "co2"
+                    and rule.operator == ">"
+                    and rule.threshold_value == settings.DEFAULT_CO2_WARNING
+                    and rule.action == "ON"
+                ),
+                None,
+            )
+            if co2_rule and first_fan:
+                current_target = devices_by_id.get(co2_rule.target_device_id)
+                if current_target is None or current_target.device_type == "light":
+                    co2_rule.target_device_id = first_fan.id
+                    co2_rule.name = "CO2 cao bat quat"
+                    co2_rule.alert_message = (
+                        f"CO2 vuot nguong an toan ({settings.DEFAULT_CO2_WARNING}), "
+                        "he thong tu dong bat quat"
+                    )
+                    await db.commit()
             continue
 
-        first_fan = next((d for d in devices if d.device_type == "fan"), None)
-        first_light = next((d for d in devices if d.device_type == "light"), None)
         db.add_all(
             [
                 AutomationRule(
                     room_id=room.id,
-                    name="Nhiệt độ cao bật quạt",
+                    name="Nhiet do cao bat quat",
                     metric="temperature",
                     operator=">",
                     threshold_value=settings.DEFAULT_TEMP_WARNING,
                     target_device_id=first_fan.id if first_fan else None,
                     action="ON",
                     alert_level="MEDIUM",
-                    alert_message=f"Nhiệt độ vượt {settings.DEFAULT_TEMP_WARNING}°C, hệ thống tự động bật quạt",
+                    alert_message=(
+                        f"Nhiet do vuot {settings.DEFAULT_TEMP_WARNING}C, "
+                        "he thong tu dong bat quat"
+                    ),
                     is_active=True,
                 ),
                 AutomationRule(
                     room_id=room.id,
-                    name="CO2 cao bật đèn cảnh báo",
+                    name="CO2 cao bat quat",
                     metric="co2",
                     operator=">",
                     threshold_value=settings.DEFAULT_CO2_WARNING,
-                    target_device_id=first_light.id if first_light else None,
+                    target_device_id=first_fan.id if first_fan else None,
                     action="ON",
                     alert_level="HIGH",
-                    alert_message=f"CO2 vượt ngưỡng an toàn ({settings.DEFAULT_CO2_WARNING}), hệ thống tự động bật đèn",
+                    alert_message=(
+                        f"CO2 vuot nguong an toan ({settings.DEFAULT_CO2_WARNING}), "
+                        "he thong tu dong bat quat"
+                    ),
                     is_active=True,
                 ),
             ]
