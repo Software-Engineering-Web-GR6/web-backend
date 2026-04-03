@@ -37,7 +37,7 @@ Bien toi thieu:
 ```env
 SECRET_KEY=change-this-secret-key
 DATABASE_URL=postgresql+asyncpg://smartclassroom:smartclassroom@localhost:5432/smart_classroom
-TEST_DATABASE_URL=sqlite+aiosqlite:///:memory:
+TEST_DATABASE_URL=postgresql+asyncpg://smartclassroom:smartclassroom@localhost:5432/smart_classroom_test
 ACCESS_TOKEN_EXPIRE_MINUTES=120
 MQTT_ENABLED=true
 MQTT_BROKER_HOST=localhost
@@ -238,7 +238,7 @@ Compose o workspace goc se dung:
 
 - PostgreSQL la database mac dinh cua ung dung.
 - Nhanh migration SQLite trong code chi con de doc/nang cap file SQLite cu neu can.
-- Test suite mac dinh van dung `TEST_DATABASE_URL=sqlite+aiosqlite:///:memory:` de giu toc do.
+- Test suite da duoc chuyen sang PostgreSQL qua `TEST_DATABASE_URL`.
 
 ## Tai lieu bo sung
 
