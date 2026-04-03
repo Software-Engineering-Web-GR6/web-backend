@@ -64,3 +64,20 @@ class TestSensorSimulator:
             )
 
         assert 23.0 <= temp <= 25.0
+
+    def test_base_co2_rises_more_slowly_without_ventilation(self, monkeypatch):
+        monkeypatch.setattr("sensor_simulator.random.uniform", lambda a, b: (a + b) / 2)
+
+        _, _, co2 = evolve_environment(
+            temp=27.0,
+            humidity=56.0,
+            co2=900.0,
+            states={
+                "fan_on": False,
+                "ac_on": False,
+                "ac_target_temp": 24.0,
+                "window_open": False,
+            },
+        )
+
+        assert co2 == 905.0
