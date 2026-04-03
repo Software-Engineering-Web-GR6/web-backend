@@ -246,6 +246,7 @@ Compose o workspace goc se dung:
 ## Tai lieu bo sung
 
 - `ARCHITECTURE.md`: tom tat kien truc va luong du lieu
+- `DEPLOY_VPS.md`: huong dan deploy production tren VPS (backend + postgres + mqtt + simulator profile)
 
 ## Cau truc chinh
 
