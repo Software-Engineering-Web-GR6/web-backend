@@ -70,6 +70,47 @@ class AuthService:
         await db.refresh(user)
         return user
 
+    async def import_users(self, db, items: list[dict[str, str]]):
+        created_count = 0
+        failed_count = 0
+        results = []
+
+        for index, item in enumerate(items, start=1):
+            email = self._normalized_email(item["email"])
+            try:
+                user = await self.create_user(
+                    db,
+                    full_name=item["full_name"],
+                    email=email,
+                    password=item["password"],
+                )
+                created_count += 1
+                results.append(
+                    {
+                        "row_number": index,
+                        "success": True,
+                        "message": "User created successfully",
+                        "email": user.email,
+                        "user_id": user.id,
+                    }
+                )
+            except ValueError as exc:
+                failed_count += 1
+                results.append(
+                    {
+                        "row_number": index,
+                        "success": False,
+                        "message": str(exc),
+                        "email": email,
+                    }
+                )
+
+        return {
+            "created_count": created_count,
+            "failed_count": failed_count,
+            "results": results,
+        }
+
     async def change_password(self, db, user_id: int, current_password: str, new_password: str):
         user = await self.get_user_by_id(db, user_id)
         if not user:

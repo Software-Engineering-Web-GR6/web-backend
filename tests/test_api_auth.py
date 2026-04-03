@@ -122,6 +122,87 @@ class TestAuthAPI:
         assert isinstance(body, list)
         assert any(item["email"] == "list-target@example.com" for item in body)
 
+    async def test_admin_can_import_users_with_partial_failures(self, client, auth_headers):
+        seed_resp = await client.post(
+            "/api/v1/auth/users",
+            json={
+                "full_name": "Existing User",
+                "email": "existing@example.com",
+                "password": "user12345",
+            },
+            headers=auth_headers,
+        )
+        assert seed_resp.status_code == 201
+
+        import_resp = await client.post(
+            "/api/v1/auth/users/import",
+            json={
+                "items": [
+                    {
+                        "full_name": "Batch User 1",
+                        "email": "batch-user-1@example.com",
+                        "password": "user12345",
+                    },
+                    {
+                        "full_name": "Existing User",
+                        "email": "existing@example.com",
+                        "password": "user12345",
+                    },
+                    {
+                        "full_name": "Batch User 2",
+                        "email": "batch-user-2@example.com",
+                        "password": "user12345",
+                    },
+                ]
+            },
+            headers=auth_headers,
+        )
+
+        assert import_resp.status_code == 200
+        body = import_resp.json()
+        assert body["created_count"] == 2
+        assert body["failed_count"] == 1
+        assert len(body["results"]) == 3
+        assert body["results"][0]["row_number"] == 1
+        assert body["results"][0]["success"] is True
+        assert body["results"][1]["row_number"] == 2
+        assert body["results"][1]["success"] is False
+        assert body["results"][1]["message"] == "Email already exists"
+
+    async def test_non_admin_cannot_import_users(self, client, auth_headers):
+        create_user_resp = await client.post(
+            "/api/v1/auth/users",
+            json={
+                "full_name": "Regular User Import",
+                "email": "regular-import@example.com",
+                "password": "user12345",
+            },
+            headers=auth_headers,
+        )
+        assert create_user_resp.status_code == 201
+
+        login_user_resp = await client.post(
+            "/api/v1/auth/login",
+            data={"username": "regular-import@example.com", "password": "user12345"},
+        )
+        assert login_user_resp.status_code == 200
+        user_token = login_user_resp.json()["access_token"]
+
+        resp = await client.post(
+            "/api/v1/auth/users/import",
+            json={
+                "items": [
+                    {
+                        "full_name": "Should Fail",
+                        "email": "should-fail@example.com",
+                        "password": "user12345",
+                    }
+                ]
+            },
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+        assert resp.status_code == 403
+
     async def test_get_me_returns_current_user(self, client, auth_headers):
         resp = await client.get("/api/v1/auth/me", headers=auth_headers)
         assert resp.status_code == 200

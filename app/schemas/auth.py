@@ -13,6 +13,25 @@ class UserCreateRequest(BaseModel):
     password: str = Field(min_length=6, max_length=128)
 
 
+class ImportUsersRequest(BaseModel):
+    items: list[UserCreateRequest] = Field(min_length=1)
+
+
+class BatchImportResultItem(BaseModel):
+    row_number: int = Field(gt=0)
+    success: bool
+    message: str
+    email: EmailStr | None = None
+    room_name: str | None = None
+    user_id: int | None = None
+
+
+class BatchImportResponse(BaseModel):
+    created_count: int
+    failed_count: int
+    results: list[BatchImportResultItem]
+
+
 class ChangePasswordRequest(BaseModel):
     current_password: str = Field(min_length=6, max_length=128)
     new_password: str = Field(min_length=6, max_length=128)

@@ -4,8 +4,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_user, get_db_session, require_admin
 from app.schemas.auth import (
+    BatchImportResponse,
     ChangePasswordRequest,
     ForgotPasswordRequest,
+    ImportUsersRequest,
     MessageResponse,
     ResetPasswordRequest,
     TokenResponse,
@@ -115,6 +117,23 @@ async def create_user(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         )
+
+
+@router.post("/users/import", response_model=BatchImportResponse)
+async def import_users(
+    payload: ImportUsersRequest,
+    db: AsyncSession = Depends(get_db_session),
+    _: dict = Depends(require_admin),
+):
+    items = [
+        {
+            "full_name": item.full_name,
+            "email": str(item.email),
+            "password": item.password,
+        }
+        for item in payload.items
+    ]
+    return await auth_service.import_users(db, items)
 
 
 @router.get("/users", response_model=list[UserResponse])
