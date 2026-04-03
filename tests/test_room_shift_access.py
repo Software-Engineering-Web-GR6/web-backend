@@ -46,7 +46,7 @@ async def test_user_blocked_when_not_granted_for_current_day(monkeypatch):
 
     class _FixedDateTime:
         @classmethod
-        def now(cls):
+        def now(cls, tz=None):
             return real_datetime(2026, 3, 17, 10, 0, 0)
 
     monkeypatch.setattr(deps, "datetime", _FixedDateTime)
@@ -67,7 +67,7 @@ async def test_user_allowed_when_granted_for_current_day(monkeypatch):
 
     class _FixedDateTime:
         @classmethod
-        def now(cls):
+        def now(cls, tz=None):
             return real_datetime(2026, 3, 17, 10, 0, 0)
 
     monkeypatch.setattr(deps, "datetime", _FixedDateTime)
