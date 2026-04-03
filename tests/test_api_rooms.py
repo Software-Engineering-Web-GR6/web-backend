@@ -62,7 +62,7 @@ class TestRoomsAPI:
 
         class _FixedDateTime:
             @classmethod
-            def now(cls):
+            def now(cls, tz=None):
                 return real_datetime(2026, 3, 16, 10, 0, 0)
 
         monkeypatch.setattr(deps, "datetime", _FixedDateTime)
