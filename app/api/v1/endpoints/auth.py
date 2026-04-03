@@ -4,11 +4,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_user, get_db_session, require_admin
 from app.schemas.auth import (
+    BatchImportResponse,
     ChangePasswordRequest,
     ForgotPasswordRequest,
     MessageResponse,
     ResetPasswordRequest,
+    ScheduleBatchImportRequest,
     TokenResponse,
+    UserBatchImportRequest,
     UserCreateRequest,
     UserResponse,
     UserRoomAccessGrantRequest,
@@ -115,6 +118,18 @@ async def create_user(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         )
+
+
+@router.post("/users/import", response_model=BatchImportResponse)
+async def import_users(
+    payload: UserBatchImportRequest,
+    db: AsyncSession = Depends(get_db_session),
+    _: dict = Depends(require_admin),
+):
+    return await auth_service.import_users(
+        db,
+        payload.items,
+    )
 
 
 @router.get("/users", response_model=list[UserResponse])
@@ -242,6 +257,18 @@ async def assign_user_schedule(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         )
+
+
+@router.post("/schedule/import", response_model=BatchImportResponse)
+async def import_schedule(
+    payload: ScheduleBatchImportRequest,
+    db: AsyncSession = Depends(get_db_session),
+    _: dict = Depends(require_admin),
+):
+    return await auth_service.import_user_schedule(
+        db,
+        payload.items,
+    )
 
 
 @router.get("/users/{user_id}/room-access", response_model=list[UserRoomAccessResponse])
