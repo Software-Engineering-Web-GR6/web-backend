@@ -17,6 +17,17 @@ class ImportUsersRequest(BaseModel):
     items: list[UserCreateRequest] = Field(min_length=1)
 
 
+class ImportScheduleRowRequest(BaseModel):
+    email: str
+    room_name: str
+    day_of_week: int | str | None
+    shift_number: int | str | None
+
+
+class ImportScheduleRequest(BaseModel):
+    items: list[ImportScheduleRowRequest] = Field(min_length=1)
+
+
 class BatchImportResultItem(BaseModel):
     row_number: int = Field(gt=0)
     success: bool

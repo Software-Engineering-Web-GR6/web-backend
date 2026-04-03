@@ -111,6 +111,90 @@ class AuthService:
             "results": results,
         }
 
+    def _parse_int_field(self, value, field_name: str) -> int:
+        if value is None:
+            raise ValueError(f"{field_name} is required")
+
+        if isinstance(value, bool):
+            raise ValueError(f"{field_name} must be a number")
+
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            raise ValueError(f"{field_name} must be a number")
+
+    async def import_schedule(self, db, items: list[dict[str, object]]):
+        created_count = 0
+        failed_count = 0
+        results = []
+
+        for index, item in enumerate(items, start=1):
+            email_raw = item.get("email")
+            room_name_raw = item.get("room_name")
+
+            try:
+                email = self._normalized_email(str(email_raw or ""))
+                room_name = str(room_name_raw or "").strip()
+                if not email:
+                    raise ValueError("email is required")
+                if not room_name:
+                    raise ValueError("room_name is required")
+
+                day_of_week = self._parse_int_field(item.get("day_of_week"), "day_of_week")
+                shift_number = self._parse_int_field(item.get("shift_number"), "shift_number")
+
+                if day_of_week < 0 or day_of_week > 6:
+                    raise ValueError("day_of_week must be between 0 and 6")
+                if shift_number < 1 or shift_number > 6:
+                    raise ValueError("shift_number must be between 1 and 6")
+
+                user_result = await db.execute(select(User).where(func.lower(User.email) == email))
+                user = user_result.scalar_one_or_none()
+                if not user:
+                    raise ValueError("User not found")
+
+                room_result = await db.execute(select(Room).where(func.lower(Room.name) == room_name.lower()))
+                room = room_result.scalar_one_or_none()
+                if not room:
+                    raise ValueError("Room not found")
+
+                await self.assign_user_schedule(
+                    db,
+                    user_id=user.id,
+                    room_id=room.id,
+                    shifts=[shift_number],
+                    days_of_week=[day_of_week],
+                )
+
+                created_count += 1
+                results.append(
+                    {
+                        "row_number": index,
+                        "success": True,
+                        "message": "Schedule imported successfully",
+                        "email": user.email,
+                        "room_name": room.name,
+                        "user_id": user.id,
+                    }
+                )
+            except ValueError as exc:
+                failed_count += 1
+                results.append(
+                    {
+                        "row_number": index,
+                        "success": False,
+                        "message": str(exc),
+                        "email": str(email_raw) if email_raw is not None else None,
+                        "room_name": str(room_name_raw) if room_name_raw is not None else None,
+                    }
+                )
+
+        return {
+            "created_count": created_count,
+            "failed_count": failed_count,
+            "results": results,
+        }
+
     async def change_password(self, db, user_id: int, current_password: str, new_password: str):
         user = await self.get_user_by_id(db, user_id)
         if not user:

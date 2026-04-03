@@ -7,6 +7,7 @@ from app.schemas.auth import (
     BatchImportResponse,
     ChangePasswordRequest,
     ForgotPasswordRequest,
+    ImportScheduleRequest,
     ImportUsersRequest,
     MessageResponse,
     ResetPasswordRequest,
@@ -134,6 +135,24 @@ async def import_users(
         for item in payload.items
     ]
     return await auth_service.import_users(db, items)
+
+
+@router.post("/schedule/import", response_model=BatchImportResponse)
+async def import_schedule(
+    payload: ImportScheduleRequest,
+    db: AsyncSession = Depends(get_db_session),
+    _: dict = Depends(require_admin),
+):
+    items = [
+        {
+            "email": item.email,
+            "room_name": item.room_name,
+            "day_of_week": item.day_of_week,
+            "shift_number": item.shift_number,
+        }
+        for item in payload.items
+    ]
+    return await auth_service.import_schedule(db, items)
 
 
 @router.get("/users", response_model=list[UserResponse])

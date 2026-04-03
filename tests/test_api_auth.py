@@ -203,6 +203,99 @@ class TestAuthAPI:
         )
         assert resp.status_code == 403
 
+    async def test_admin_can_import_schedule_with_partial_failures(self, client, auth_headers):
+        create_user_resp = await client.post(
+            "/api/v1/auth/users",
+            json={
+                "full_name": "Schedule Import User",
+                "email": "schedule-import@example.com",
+                "password": "user12345",
+            },
+            headers=auth_headers,
+        )
+        assert create_user_resp.status_code == 201
+
+        resp = await client.post(
+            "/api/v1/auth/schedule/import",
+            json={
+                "items": [
+                    {
+                        "email": "schedule-import@example.com",
+                        "room_name": "Room A101",
+                        "day_of_week": 6,
+                        "shift_number": 6,
+                    },
+                    {
+                        "email": "missing-user@example.com",
+                        "room_name": "Room A101",
+                        "day_of_week": 2,
+                        "shift_number": 2,
+                    },
+                    {
+                        "email": "schedule-import@example.com",
+                        "room_name": "Room Unknown",
+                        "day_of_week": 2,
+                        "shift_number": 2,
+                    },
+                    {
+                        "email": "schedule-import@example.com",
+                        "room_name": "Room A101",
+                        "day_of_week": 9,
+                        "shift_number": 2,
+                    },
+                ]
+            },
+            headers=auth_headers,
+        )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["created_count"] == 1
+        assert body["failed_count"] == 3
+        assert len(body["results"]) == 4
+        assert body["results"][0]["success"] is True
+        assert body["results"][1]["success"] is False
+        assert body["results"][1]["message"] == "User not found"
+        assert body["results"][2]["success"] is False
+        assert body["results"][2]["message"] == "Room not found"
+        assert body["results"][3]["success"] is False
+        assert body["results"][3]["message"] == "day_of_week must be between 0 and 6"
+
+    async def test_non_admin_cannot_import_schedule(self, client, auth_headers):
+        create_user_resp = await client.post(
+            "/api/v1/auth/users",
+            json={
+                "full_name": "Regular User Schedule Import",
+                "email": "regular-schedule-import@example.com",
+                "password": "user12345",
+            },
+            headers=auth_headers,
+        )
+        assert create_user_resp.status_code == 201
+
+        login_user_resp = await client.post(
+            "/api/v1/auth/login",
+            data={"username": "regular-schedule-import@example.com", "password": "user12345"},
+        )
+        assert login_user_resp.status_code == 200
+        user_token = login_user_resp.json()["access_token"]
+
+        resp = await client.post(
+            "/api/v1/auth/schedule/import",
+            json={
+                "items": [
+                    {
+                        "email": "regular-schedule-import@example.com",
+                        "room_name": "Room A101",
+                        "day_of_week": 1,
+                        "shift_number": 1,
+                    }
+                ]
+            },
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+        assert resp.status_code == 403
+
     async def test_get_me_returns_current_user(self, client, auth_headers):
         resp = await client.get("/api/v1/auth/me", headers=auth_headers)
         assert resp.status_code == 200
