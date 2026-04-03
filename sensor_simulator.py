@@ -25,7 +25,7 @@ from datetime import datetime
 import requests
 import paho.mqtt.publish as mqtt_publish
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = os.getenv("BACKEND_BASE_URL", "http://localhost:8000")
 LOGIN_URL = f"{BASE_URL}/api/v1/auth/login"
 ROOMS_URL = f"{BASE_URL}/api/v1/rooms"
 INGEST_URL = f"{BASE_URL}/api/v1/sensors/ingest"
@@ -37,8 +37,8 @@ MQTT_SENSOR_TOPIC = os.getenv("MQTT_SENSOR_TOPIC", "smartclassrooms/sensors/read
 TRANSPORT_MODE = os.getenv("SIMULATOR_TRANSPORT", "mqtt").lower()
 RESET_HISTORY_ON_START = os.getenv("SIMULATOR_RESET_HISTORY_ON_START", "false").lower() == "true"
 
-USERNAME = "admin@example.com"
-PASSWORD = "admin123"
+USERNAME = os.getenv("SIMULATOR_USERNAME", "admin@example.com")
+PASSWORD = os.getenv("SIMULATOR_PASSWORD", "admin123")
 
 INTERVAL_SECONDS = 2
 REQUEST_TIMEOUT = 5

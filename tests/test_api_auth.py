@@ -273,6 +273,30 @@ class TestAuthAPI:
         assert list_resp.status_code == 200
         assert all(item["id"] != user_id for item in list_resp.json())
 
+    async def test_admin_can_delete_user_with_schedule(self, client, auth_headers):
+        create_resp = await client.post(
+            "/api/v1/auth/users",
+            json={
+                "full_name": "Delete With Schedule",
+                "email": "delete-with-schedule@example.com",
+                "password": "user12345",
+            },
+            headers=auth_headers,
+        )
+        assert create_resp.status_code == 201
+        user_id = create_resp.json()["id"]
+
+        assign_resp = await client.post(
+            f"/api/v1/auth/users/{user_id}/schedule",
+            json={"room_id": 1, "shifts": [2], "days_of_week": [0]},
+            headers=auth_headers,
+        )
+        assert assign_resp.status_code == 200
+
+        delete_resp = await client.delete(f"/api/v1/auth/users/{user_id}", headers=auth_headers)
+        assert delete_resp.status_code == 200
+        assert delete_resp.json()["message"] == "User deleted successfully"
+
     async def test_delete_non_existing_user_returns_404(self, client, auth_headers):
         resp = await client.delete("/api/v1/auth/users/999999", headers=auth_headers)
         assert resp.status_code == 404

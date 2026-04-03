@@ -192,6 +192,13 @@ class AuthService:
         if not user:
             raise ValueError("User not found")
 
+        # Remove dependent records first to avoid FK violations on PostgreSQL.
+        await db.execute(
+            delete(UserRoomShiftAccess).where(UserRoomShiftAccess.user_id == user_id)
+        )
+        await db.execute(
+            delete(PasswordResetCode).where(PasswordResetCode.user_id == user_id)
+        )
         await db.delete(user)
         await db.commit()
 

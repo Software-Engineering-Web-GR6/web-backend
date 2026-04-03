@@ -25,7 +25,7 @@ MQTT_BROKER_PORT = int(os.getenv("MQTT_BROKER_PORT", "1883"))
 MQTT_DEVICE_COMMAND_TOPIC_PREFIX = os.getenv(
     "MQTT_DEVICE_COMMAND_TOPIC_PREFIX",
     "smartclassrooms/devices",
-)
+).rstrip("/")
 
 COMMAND_TOPIC = f"{MQTT_DEVICE_COMMAND_TOPIC_PREFIX}/+/+/commands"
 STATUS_TOPIC_TEMPLATE = f"{MQTT_DEVICE_COMMAND_TOPIC_PREFIX}/{{room_id}}/{{device_id}}/status"
@@ -53,7 +53,14 @@ def on_connect(client: mqtt.Client, _userdata, _flags, rc: int) -> None:
         print(f"MQTT connect failed with code {rc}", flush=True)
         return
 
-    client.subscribe(COMMAND_TOPIC)
+    subscribe_result, _mid = client.subscribe(COMMAND_TOPIC)
+    if subscribe_result != mqtt.MQTT_ERR_SUCCESS:
+        print(
+            f"MQTT subscribe failed | topic={COMMAND_TOPIC} result={subscribe_result}",
+            flush=True,
+        )
+        return
+
     print(
         f"Device command simulator connected | broker={MQTT_BROKER_HOST}:{MQTT_BROKER_PORT} | topic={COMMAND_TOPIC}",
         flush=True,
@@ -80,8 +87,17 @@ def on_message(client: mqtt.Client, _userdata, message: mqtt.MQTTMessage) -> Non
     if room_id is None or device_id is None:
         return
 
+    if not command:
+        print(f"Ignoring command without 'command' field on {message.topic}", flush=True)
+        return
+
     status_topic = STATUS_TOPIC_TEMPLATE.format(room_id=room_id, device_id=device_id)
-    client.publish(status_topic, json.dumps(build_status_payload(payload)), qos=0)
+    publish_result = client.publish(status_topic, json.dumps(build_status_payload(payload)), qos=0)
+    if publish_result.rc != mqtt.MQTT_ERR_SUCCESS:
+        print(
+            f"Failed to publish ACK | topic={status_topic} result={publish_result.rc}",
+            flush=True,
+        )
 
 
 def handle_shutdown(_signum=None, _frame=None) -> None:
