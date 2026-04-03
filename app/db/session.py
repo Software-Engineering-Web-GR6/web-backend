@@ -38,6 +38,11 @@ async def _add_column_if_missing(conn, table_name: str, column_name: str, ddl: s
 
 
 async def _migrate_legacy_schema(conn) -> None:
+    # Legacy migration queries below use SQLite-specific syntax.
+    # Skip them for PostgreSQL and other databases.
+    if conn.dialect.name != "sqlite":
+        return
+
     if await _add_column_if_missing(
         conn,
         "rooms",
