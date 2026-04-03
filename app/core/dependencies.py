@@ -1,4 +1,5 @@
 from datetime import datetime, time
+from zoneinfo import ZoneInfo
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -8,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.alert import Alert
 from app.models.device import Device
 from app.models.user_room_shift_access import UserRoomShiftAccess
+from app.core.config import settings
 from app.db.session import get_db
 from app.core.security import decode_access_token
 
@@ -21,6 +23,15 @@ SHIFT_WINDOWS: dict[int, tuple[time, time]] = {
     5: (time(18, 15), time(19, 50)),
     6: (time(19, 55), time(21, 30)),
 }
+
+
+def get_local_now(now: datetime | None = None) -> datetime:
+    timezone = ZoneInfo(settings.APP_TIMEZONE)
+    if now is None:
+        return datetime.now(timezone)
+    if now.tzinfo is None:
+        return now.replace(tzinfo=timezone)
+    return now.astimezone(timezone)
 
 
 async def get_db_session(db: AsyncSession = Depends(get_db)) -> AsyncSession:
@@ -41,7 +52,7 @@ async def require_admin(current_user: dict = Depends(get_current_user)) -> dict:
 
 
 def get_current_shift(now: datetime | None = None) -> int | None:
-    now_time = (now or datetime.now()).time()
+    now_time = get_local_now(now).time()
     for shift_number, (start, end) in SHIFT_WINDOWS.items():
         if start <= now_time < end:
             return shift_number
@@ -68,7 +79,7 @@ async def ensure_room_shift_access(db: AsyncSession, current_user: dict, room_id
             detail="Outside all allowed shifts",
         )
 
-    current_day = datetime.now().weekday()
+    current_day = get_local_now().weekday()
 
     permission_result = await db.execute(
         select(UserRoomShiftAccess.id).where(
@@ -104,7 +115,7 @@ async def get_accessible_room_ids(db: AsyncSession, current_user: dict) -> list[
     if current_shift is None:
         return []
 
-    current_day = datetime.now().weekday()
+    current_day = get_local_now().weekday()
     result = await db.execute(
         select(UserRoomShiftAccess.room_id)
         .where(

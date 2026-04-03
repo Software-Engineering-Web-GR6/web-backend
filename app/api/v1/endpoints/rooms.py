@@ -7,7 +7,7 @@ from app.core.dependencies import (
     get_db_session,
     require_admin,
 )
-from app.schemas.room import RoomAutomationModeUpdate, RoomResponse
+from app.schemas.room import RoomAutomationModeUpdate, RoomCreateRequest, RoomResponse
 from app.services.room_service import room_service
 
 router = APIRouter()
@@ -23,6 +23,23 @@ async def list_rooms(
 
     room_ids = await get_accessible_room_ids(db, current_user)
     return await room_service.list_by_ids(db, room_ids)
+
+
+@router.post("", response_model=RoomResponse, status_code=201)
+async def create_room(
+    payload: RoomCreateRequest,
+    db: AsyncSession = Depends(get_db_session),
+    _: dict = Depends(require_admin),
+):
+    try:
+        return await room_service.create_room(
+            db,
+            name=payload.name,
+            building=payload.building,
+            location=payload.location,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @router.put("/{room_id}/automation-mode", response_model=RoomResponse)

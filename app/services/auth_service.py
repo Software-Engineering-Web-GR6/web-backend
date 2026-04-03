@@ -1,7 +1,9 @@
 from datetime import datetime, timedelta, timezone
 import hashlib
 import secrets
+from typing import Any
 
+from pydantic import EmailStr, TypeAdapter, ValidationError
 from sqlalchemy import delete, func, select
 from app.models.user import User
 from app.models.room import Room
@@ -13,8 +15,82 @@ from app.services.mail_service import mail_service
 
 
 class AuthService:
+    _email_adapter = TypeAdapter(EmailStr)
+
     def _normalized_email(self, email: str) -> str:
         return email.strip().lower()
+
+    def _get_text(self, value: Any) -> str:
+        if value is None:
+            return ""
+        return str(value).strip()
+
+    def _parse_import_email(self, value: Any) -> str:
+        email = self._get_text(value)
+        try:
+            normalized = self._email_adapter.validate_python(email)
+        except ValidationError as exc:
+            raise ValueError("Invalid email") from exc
+        return self._normalized_email(str(normalized))
+
+    def _parse_import_integer(self, value: Any, *, field_name: str, minimum: int, maximum: int) -> int:
+        try:
+            parsed = int(str(value).strip())
+        except (TypeError, ValueError, AttributeError) as exc:
+            raise ValueError(f"{field_name} must be an integer between {minimum} and {maximum}") from exc
+
+        if parsed < minimum or parsed > maximum:
+            raise ValueError(f"{field_name} must be an integer between {minimum} and {maximum}")
+        return parsed
+
+    def _validate_import_user_row(self, item: dict[str, Any]) -> dict[str, str]:
+        full_name = self._get_text(item.get("full_name") or item.get("name"))
+        email = self._parse_import_email(item.get("email"))
+        password = self._get_text(item.get("password"))
+
+        if len(full_name) < 2:
+            raise ValueError("Full name must be at least 2 characters")
+        if len(full_name) > 100:
+            raise ValueError("Full name must not exceed 100 characters")
+        if len(password) < 6:
+            raise ValueError("Password must be at least 6 characters")
+        if len(password) > 128:
+            raise ValueError("Password must not exceed 128 characters")
+
+        return {
+            "full_name": full_name,
+            "email": email,
+            "password": password,
+        }
+
+    def _validate_import_schedule_row(self, item: dict[str, Any]) -> dict[str, str | int]:
+        email = self._parse_import_email(item.get("email"))
+        room_name = self._get_text(item.get("room_name") or item.get("room"))
+
+        if len(room_name) < 3:
+            raise ValueError("Room name must be at least 3 characters")
+        if len(room_name) > 100:
+            raise ValueError("Room name must not exceed 100 characters")
+
+        day_of_week = self._parse_import_integer(
+            item.get("day_of_week"),
+            field_name="day_of_week",
+            minimum=0,
+            maximum=6,
+        )
+        shift_number = self._parse_import_integer(
+            item.get("shift_number"),
+            field_name="shift_number",
+            minimum=1,
+            maximum=6,
+        )
+
+        return {
+            "email": email,
+            "room_name": room_name,
+            "day_of_week": day_of_week,
+            "shift_number": shift_number,
+        }
 
     def _hash_reset_code(self, email: str, code: str) -> str:
         payload = f"{self._normalized_email(email)}:{code}:{settings.SECRET_KEY}"
@@ -54,14 +130,15 @@ class AuthService:
         return user
 
     async def create_user(self, db, full_name: str, email: str, password: str):
-        result = await db.execute(select(User).where(User.email == email))
+        normalized_email = self._normalized_email(email)
+        result = await db.execute(select(User).where(func.lower(User.email) == normalized_email))
         existing_user = result.scalar_one_or_none()
         if existing_user:
             raise ValueError("Email already exists")
         
         user = User(
             full_name=full_name,
-            email=email,
+            email=normalized_email,
             password_hash=hash_password(password),
             role="user",
         )
@@ -69,6 +146,45 @@ class AuthService:
         await db.commit()
         await db.refresh(user)
         return user
+
+    async def import_users(self, db, items: list[dict]):
+        results = []
+        created_count = 0
+
+        for index, item in enumerate(items, start=1):
+            try:
+                validated = self._validate_import_user_row(item)
+                user = await self.create_user(
+                    db,
+                    full_name=validated["full_name"],
+                    email=validated["email"],
+                    password=validated["password"],
+                )
+                created_count += 1
+                results.append(
+                    {
+                        "row_number": index,
+                        "success": True,
+                        "message": "User created successfully",
+                        "email": user.email,
+                        "user_id": user.id,
+                    }
+                )
+            except ValueError as exc:
+                results.append(
+                    {
+                        "row_number": index,
+                        "success": False,
+                        "message": str(exc),
+                        "email": self._get_text(item.get("email")) or None,
+                    }
+                )
+
+        return {
+            "created_count": created_count,
+            "failed_count": len(results) - created_count,
+            "results": results,
+        }
 
     async def change_password(self, db, user_id: int, current_password: str, new_password: str):
         user = await self.get_user_by_id(db, user_id)
@@ -256,6 +372,94 @@ class AuthService:
 
     async def assign_user_schedule(self, db, user_id: int, room_id: int, shifts: list[int], days_of_week: list[int]):
         return await self.grant_room_shift_access(db, user_id, room_id, shifts, days_of_week)
+
+    async def import_user_schedule(self, db, items: list[dict]):
+        results = []
+        created_count = 0
+
+        for index, item in enumerate(items, start=1):
+            try:
+                validated = self._validate_import_schedule_row(item)
+            except ValueError as exc:
+                results.append(
+                    {
+                        "row_number": index,
+                        "success": False,
+                        "message": str(exc),
+                        "email": self._get_text(item.get("email")) or None,
+                        "room_name": self._get_text(item.get("room_name") or item.get("room")) or None,
+                    }
+                )
+                continue
+
+            normalized_email = str(validated["email"])
+            room_name = str(validated["room_name"])
+
+            user_result = await db.execute(select(User).where(func.lower(User.email) == normalized_email))
+            user = user_result.scalar_one_or_none()
+            if not user:
+                results.append(
+                    {
+                        "row_number": index,
+                        "success": False,
+                        "message": "User not found",
+                        "email": normalized_email,
+                        "room_name": room_name,
+                    }
+                )
+                continue
+
+            room_result = await db.execute(select(Room).where(func.lower(Room.name) == room_name.lower()))
+            room = room_result.scalar_one_or_none()
+            if not room:
+                results.append(
+                    {
+                        "row_number": index,
+                        "success": False,
+                        "message": "Room not found",
+                        "email": normalized_email,
+                        "room_name": room_name,
+                        "user_id": user.id,
+                    }
+                )
+                continue
+
+            try:
+                await self.assign_user_schedule(
+                    db,
+                    user.id,
+                    room.id,
+                    [int(validated["shift_number"])],
+                    [int(validated["day_of_week"])],
+                )
+                created_count += 1
+                results.append(
+                    {
+                        "row_number": index,
+                        "success": True,
+                        "message": "Schedule imported successfully",
+                        "email": normalized_email,
+                        "room_name": room.name,
+                        "user_id": user.id,
+                    }
+                )
+            except ValueError as exc:
+                results.append(
+                    {
+                        "row_number": index,
+                        "success": False,
+                        "message": str(exc),
+                        "email": normalized_email,
+                        "room_name": room_name,
+                        "user_id": user.id,
+                    }
+                )
+
+        return {
+            "created_count": created_count,
+            "failed_count": len(results) - created_count,
+            "results": results,
+        }
 
     async def list_room_shift_access(self, db, user_id: int):
         result = await db.execute(

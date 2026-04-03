@@ -1,4 +1,5 @@
 from sqlalchemy import select
+from sqlalchemy import func
 
 from app.models.room import Room
 from app.repositories.base import BaseRepository
@@ -34,6 +35,10 @@ class RoomRepository(BaseRepository):
         await db.commit()
         await db.refresh(room)
         return room
+
+    async def get_by_name(self, db, room_name: str):
+        result = await db.execute(select(Room).where(func.lower(Room.name) == room_name.strip().lower()))
+        return result.scalar_one_or_none()
 
 
 room_repository = RoomRepository()
