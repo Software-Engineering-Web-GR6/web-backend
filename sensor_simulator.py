@@ -20,7 +20,7 @@ import threading
 import time
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 import requests
 import paho.mqtt.publish as mqtt_publish
@@ -226,7 +226,7 @@ def send_reading(
         "humidity": humidity,
         "co2": co2,
         "motion_detected": random.choice([True, False]),
-        "recorded_at": datetime.now().isoformat(),
+        "recorded_at": datetime.now(timezone.utc).isoformat(),
     }
     if TRANSPORT_MODE == "mqtt":
         mqtt_publish.single(

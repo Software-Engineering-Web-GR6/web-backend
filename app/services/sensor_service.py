@@ -11,8 +11,11 @@ from app.websocket.manager import ws_manager
 class SensorService:
     async def ingest(self, db, payload):
         data = payload.model_dump()
-        if data.get("recorded_at") is None:
+        recorded_at = data.get("recorded_at")
+        if recorded_at is None:
             data["recorded_at"] = datetime.now(timezone.utc)
+        elif recorded_at.tzinfo is None:
+            data["recorded_at"] = recorded_at.replace(tzinfo=timezone.utc)
         reading = await sensor_repository.create(db, **data)
         room = await room_repository.get_by_id(db, payload.room_id)
         executed = []

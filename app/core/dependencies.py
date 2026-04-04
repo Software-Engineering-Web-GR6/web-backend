@@ -1,4 +1,5 @@
 from datetime import datetime, time
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -8,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.alert import Alert
 from app.models.device import Device
 from app.models.user_room_shift_access import UserRoomShiftAccess
+from app.core.config import settings
 from app.db.session import get_db
 from app.core.security import decode_access_token
 
@@ -41,11 +43,19 @@ async def require_admin(current_user: dict = Depends(get_current_user)) -> dict:
 
 
 def get_current_shift(now: datetime | None = None) -> int | None:
-    now_time = (now or datetime.now()).time()
+    now_time = get_current_datetime(now).time().replace(tzinfo=None)
     for shift_number, (start, end) in SHIFT_WINDOWS.items():
         if start <= now_time < end:
             return shift_number
     return None
+
+
+def get_current_datetime(now: datetime | None = None) -> datetime:
+    current = now or datetime.now()
+    try:
+        return current.astimezone(ZoneInfo(settings.APP_TIMEZONE))
+    except ZoneInfoNotFoundError:
+        return current
 
 
 async def ensure_room_shift_access(db: AsyncSession, current_user: dict, room_id: int) -> None:
@@ -68,7 +78,7 @@ async def ensure_room_shift_access(db: AsyncSession, current_user: dict, room_id
             detail="Outside all allowed shifts",
         )
 
-    current_day = datetime.now().weekday()
+    current_day = get_current_datetime().weekday()
 
     permission_result = await db.execute(
         select(UserRoomShiftAccess.id).where(
@@ -104,7 +114,7 @@ async def get_accessible_room_ids(db: AsyncSession, current_user: dict) -> list[
     if current_shift is None:
         return []
 
-    current_day = datetime.now().weekday()
+    current_day = get_current_datetime().weekday()
     result = await db.execute(
         select(UserRoomShiftAccess.room_id)
         .where(
