@@ -1,4 +1,6 @@
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from app.core.config import settings
 from app.repositories.room_repository import room_repository
 from app.repositories.sensor_repository import sensor_repository
 from app.repositories.rule_repository import rule_repository
@@ -9,13 +11,19 @@ from app.websocket.manager import ws_manager
 
 
 class SensorService:
+    def _normalize_recorded_at(self, value: datetime | None) -> datetime:
+        if value is None:
+            return datetime.now(timezone.utc)
+        if value.tzinfo is None:
+            try:
+                return value.replace(tzinfo=ZoneInfo(settings.APP_TIMEZONE)).astimezone(timezone.utc)
+            except ZoneInfoNotFoundError:
+                return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
     async def ingest(self, db, payload):
         data = payload.model_dump()
-        recorded_at = data.get("recorded_at")
-        if recorded_at is None:
-            data["recorded_at"] = datetime.now(timezone.utc)
-        elif recorded_at.tzinfo is None:
-            data["recorded_at"] = recorded_at.replace(tzinfo=timezone.utc)
+        data["recorded_at"] = self._normalize_recorded_at(data.get("recorded_at"))
         reading = await sensor_repository.create(db, **data)
         room = await room_repository.get_by_id(db, payload.room_id)
         executed = []
@@ -46,10 +54,16 @@ class SensorService:
         return reading, executed
 
     async def get_latest(self, db, room_id: int):
-        return await sensor_repository.get_latest(db, room_id)
+        latest = await sensor_repository.get_latest(db, room_id)
+        if latest:
+            latest.recorded_at = self._normalize_recorded_at(latest.recorded_at)
+        return latest
 
     async def get_history(self, db, room_id: int, limit: int = 50):
-        return await sensor_repository.get_history(db, room_id, limit)
+        history = await sensor_repository.get_history(db, room_id, limit)
+        for item in history:
+            item.recorded_at = self._normalize_recorded_at(item.recorded_at)
+        return history
 
     async def clear_history(self, db, room_ids: list[int] | None = None):
         return await sensor_repository.clear_history(db, room_ids)

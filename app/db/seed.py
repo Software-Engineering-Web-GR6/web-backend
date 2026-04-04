@@ -183,11 +183,33 @@ async def seed_data(db):
 
         rule_result = await db.execute(select(AutomationRule).where(AutomationRule.room_id == room.id))
         rules = list(rule_result.scalars().all())
+
+        # Migrate legacy default CO2 rule from auto-light action to alert-only guidance.
+        legacy_co2_rule = next(
+            (
+                rule
+                for rule in rules
+                if rule.metric == "co2" and rule.name in {"CO2 cao bật đèn cảnh báo", "CO2 cao yêu cầu mở cửa"}
+            ),
+            None,
+        )
+        if legacy_co2_rule:
+            legacy_co2_rule.name = "CO2 cao yêu cầu mở cửa"
+            legacy_co2_rule.operator = ">"
+            legacy_co2_rule.threshold_value = settings.DEFAULT_CO2_WARNING
+            legacy_co2_rule.target_device_id = None
+            legacy_co2_rule.action = "OPEN"
+            legacy_co2_rule.alert_level = "HIGH"
+            legacy_co2_rule.alert_message = (
+                f"CO2 vượt ngưỡng an toàn ({settings.DEFAULT_CO2_WARNING}), vui lòng mở cửa để thông gió"
+            )
+            legacy_co2_rule.is_active = True
+            await db.commit()
+
         if rules:
             continue
 
         first_fan = next((d for d in devices if d.device_type == "fan"), None)
-        first_light = next((d for d in devices if d.device_type == "light"), None)
         db.add_all(
             [
                 AutomationRule(
@@ -204,14 +226,14 @@ async def seed_data(db):
                 ),
                 AutomationRule(
                     room_id=room.id,
-                    name="CO2 cao bật đèn cảnh báo",
+                    name="CO2 cao yêu cầu mở cửa",
                     metric="co2",
                     operator=">",
                     threshold_value=settings.DEFAULT_CO2_WARNING,
-                    target_device_id=first_light.id if first_light else None,
-                    action="ON",
+                    target_device_id=None,
+                    action="OPEN",
                     alert_level="HIGH",
-                    alert_message=f"CO2 vượt ngưỡng an toàn ({settings.DEFAULT_CO2_WARNING}), hệ thống tự động bật đèn",
+                    alert_message=f"CO2 vượt ngưỡng an toàn ({settings.DEFAULT_CO2_WARNING}), vui lòng mở cửa để thông gió",
                     is_active=True,
                 ),
             ]
